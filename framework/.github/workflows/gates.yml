@@ -198,7 +198,9 @@ jobs:
         run: |
           set -euo pipefail
           gh api --paginate "repos/$REPO/issues/$NUMBER/comments" --jq '.[]|{body}' | jq -s '.' > comments.json
-          ./scripts/check-review.sh "${{ steps.pr.outputs.head_sha }}" comments.json "${{ steps.pr.outputs.base_sha }}"
+          # Tee'd so the publishing step can tell a refusal from an absence without re-deriving it.
+          ./scripts/check-review.sh "${{ steps.pr.outputs.head_sha }}" comments.json "${{ steps.pr.outputs.base_sha }}" 2>&1 | tee check.log
+          exit "${PIPESTATUS[0]}"
 
       - name: Publish the verdict as a commit status
         if: always()
@@ -215,7 +217,15 @@ jobs:
           elif [ "${{ steps.check.outcome }}" = "success" ]; then
             state=success; desc="Reviewed by an agent that did not build it"
           elif [ "${{ steps.check.outcome }}" = "failure" ]; then
-            state=failure; desc="No current review by an independent agent — see the log"
+            state=failure
+            # A REFUSED REVIEW AND AN ABSENT ONE ARE DIFFERENT FACTS. They shared this string, so a
+            # reviewer that had just posted `changes-requested` could not tell its verdict had
+            # landed from its comment never being parsed at all — it had to open the run log.
+            if grep -q 'the current review requests changes' check.log 2>/dev/null; then
+              desc="Changes requested by a reviewer — the review landed and refused this head"
+            else
+              desc="No current review by an independent agent — see the log"
+            fi
           else
             # ACCUSATION IS RESERVED FOR THE ONE OUTCOME THAT MEANS IT. `cancelled`, `skipped` and
             # an empty string all land here and hold, rather than reporting that no review exists.
