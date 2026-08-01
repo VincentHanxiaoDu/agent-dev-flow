@@ -37,7 +37,14 @@ run_gate() {
   # Who built it: the Agent: trailer of every commit in the range.
   authors=$(git log "$base..HEAD" --format=%B | sed -n 's/^Agent:[[:space:]]*//p' | sort -u)
   [ -n "$authors" ] || {
-    echo "::error::no commit in $base..HEAD carries an 'Agent:' trailer, so independence cannot be judged. Refusing rather than accepting any reviewer." >&2
+    # SAY WHOSE PROBLEM THIS IS. This red is not about the review — it is about the commits, and a
+    # reviewer reading "no independent review" concludes it is theirs to fix. The naming gate now
+    # catches a missing trailer first and names the remedy; if this still fires, say plainly that
+    # nothing here is a verdict on the review.
+    echo "::error::no commit in $base..HEAD carries an 'Agent:' trailer, so who built this cannot be determined." >&2
+    echo "  THIS IS NOT A VERDICT ON ANY REVIEW. It is a defect in the commits: add 'Agent: <role>'" >&2
+    echo "  to each of them. The 'Branch name and commit convention' gate reports the same thing" >&2
+    echo "  with the remedy, and it is the one to act on." >&2
     return 1
   }
 

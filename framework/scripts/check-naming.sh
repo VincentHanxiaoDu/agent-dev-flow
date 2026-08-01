@@ -47,6 +47,19 @@ run_gate() {
       echo "::error::$(git rev-parse --short "$sha") subject is ${#subject} characters, limit $MAX_SUBJECT: $subject" >&2
       rc=1
     fi
+    # THE `Agent:` TRAILER IS A COMMIT CONVENTION, SO IT IS CHECKED HERE. It was only enforced by
+    # the review gate, which derives the author set from it and — finding none — refuses to judge
+    # independence at all. That red said "no current review by an independent agent", which reads
+    # as the reviewer's fault when the cause is a missing line in the author's commit. Red for the
+    # wrong reason is the class this whole project exists to remove, and it was in a gate name.
+    #
+    # This gate is where an author looks, and it fails with the actual remedy.
+    if ! git log -1 --format=%B "$sha" | grep -qE '^Agent:[[:space:]]*\S'; then
+      echo "::error::$(git rev-parse --short "$sha") has no 'Agent:' trailer." >&2
+      echo "  Add a final paragraph 'Agent: <your-role>' — the review gate reads it to work out who" >&2
+      echo "  built this, and without it no reviewer can be shown to be independent of the work." >&2
+      rc=1
+    fi
   done < <(git rev-list "$base..HEAD")
 
   [ "$rc" -eq 0 ] && echo "naming ok: branch and $(git rev-list --count "$base..HEAD") commit subject(s) examined"
@@ -76,7 +89,9 @@ self_test() {
 
   # 3. A well-formed branch and subject must PASS.
   mkdir -p "$tmp/b"; b=$(_repo "$tmp/b")
-  echo y > "$tmp/b/g"; git -C "$tmp/b" add -A; git -C "$tmp/b" commit -qm "fix(store): refuse an unwritable store"
+  echo y > "$tmp/b/g"; git -C "$tmp/b" add -A; git -C "$tmp/b" commit -qm "fix(store): refuse an unwritable store
+
+Agent: dev-a"
   ( cd "$tmp/b" && bash "$me" dev/fix/42-unwritable-store "$b" ) >/dev/null 2>&1 \
     || { echo "SELF-TEST FAIL: a well-formed branch and subject were rejected" >&2; rc=1; }
 
@@ -90,11 +105,26 @@ self_test() {
   mkdir -p "$tmp/c"; c=$(_repo "$tmp/c")
   local long; long="fix(store): $(printf 'x%.0s' $(seq 1 $((MAX_SUBJECT - 11))))"
   [ "${#long}" -eq $((MAX_SUBJECT + 1)) ] || { echo "SELF-TEST FAIL: the fixture is ${#long} chars, meant to be $((MAX_SUBJECT+1)) — refusing to report a boundary test that did not test the boundary" >&2; rc=1; }
-  echo z > "$tmp/c/h"; git -C "$tmp/c" add -A; git -C "$tmp/c" commit -qm "$long"
+  echo z > "$tmp/c/h"; git -C "$tmp/c" add -A; git -C "$tmp/c" commit -qm "$long
+
+Agent: dev-a"
   ( cd "$tmp/c" && bash "$me" dev/fix/1-ok "$c" ) >/dev/null 2>&1 \
     && { echo "SELF-TEST FAIL: a subject one character over the limit PASSED" >&2; rc=1; }
 
-  [ "$rc" -eq 0 ] && echo "self-test passed: a missing or unreachable base refuses, good input passes, and a subject one over the limit fails"
+  # 6. A COMMIT WITH NO Agent: TRAILER MUST FAIL HERE, not three gates later as somebody else's
+  #    independence problem.
+  mkdir -p "$tmp/d"; d=$(_repo "$tmp/d")
+  echo q > "$tmp/d/i"; git -C "$tmp/d" add -A; git -C "$tmp/d" commit -qm "fix(x): no trailer here"
+  ( cd "$tmp/d" && bash "$me" dev/fix/1-ok "$d" ) >/dev/null 2>&1 \
+    && { echo "SELF-TEST FAIL: a commit with no Agent: trailer PASSED" >&2; rc=1; }
+  # And one WITH the trailer must pass, or the arm above proves nothing about the trailer.
+  git -C "$tmp/d" commit -q --amend -m "fix(x): trailer present
+
+Agent: dev-a"
+  ( cd "$tmp/d" && bash "$me" dev/fix/1-ok "$d" ) >/dev/null 2>&1 \
+    || { echo "SELF-TEST FAIL: a commit WITH an Agent: trailer was rejected" >&2; rc=1; }
+
+  [ "$rc" -eq 0 ] && echo "self-test passed: a missing or unreachable base refuses, good input passes, a subject one over the limit fails, and a missing Agent: trailer fails here rather than as an independence problem"
   return "$rc"
 }
 
