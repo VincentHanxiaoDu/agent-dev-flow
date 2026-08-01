@@ -137,6 +137,16 @@ while true; do
       continue
     fi
 
+    # A FAILING COMMIT STATUS IS A SECOND, INDEPENDENT RED. Check runs and commit statuses are
+    # different endpoints, and the review verdict lives ONLY in the status — deliberately, so the
+    # job can stay green and auto-merge can arm. Watching check runs alone reported a pull request
+    # as needing one fix when it had two, and the invisible one was the one blocking the merge.
+    # Measured: a dev agent fixed what the event named, then found the blocker by hand.
+    if st=$(gh api "repos/$REPO/commits/$sha/status" 2>/dev/null); then
+      badst=$(printf '%s' "$st" | jq -r '[.statuses[]? | select(.state=="failure" or .state=="error") | "\(.context): \(.description)"] | join("; ")' 2>/dev/null || echo "")
+      [ -n "$badst" ] && { emit FAILING "$num" "$title" "[$branch] $badst"; continue; }
+    fi
+
     # A review asking for changes is a state the author must hear about — it is not visible in any
     # check run, and a PR sitting on it looks identical to one waiting for a reviewer.
     if revs=$(gh api "repos/$REPO/pulls/$num/reviews" 2>/dev/null); then
