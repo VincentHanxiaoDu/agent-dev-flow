@@ -44,17 +44,19 @@ jobs:
       - name: Self-test every gate
         run: |
           set -euo pipefail
-          for s in ./scripts/check-*.sh ./scripts/queue.sh ./scripts/watch-*.sh; do
-            [ -f "$s" ] || continue
+          # SCOPED TO THE GATES THIS WORKFLOW RUNS. `check-prompts.sh` validates the agent
+          # command files, which are a LOCAL concern — the installer verifies them once, in the
+          # target, and nothing about a pull request can change them. Requiring them here would
+          # force a project to commit `.claude/` for a check that says nothing about its code.
+          for s in ./scripts/check-naming.sh ./scripts/check-tasks-complete.sh \
+                   ./scripts/check-generated.sh ./scripts/check-review.sh; do
+            [ -f "$s" ] || { echo "::error::$s is missing — the gates cannot run"; exit 1; }
             bash "$s" --self-test >/dev/null || { echo "::error::$s cannot be shown to fail"; exit 1; }
           done
           echo "every gate's self-test passes"
 
       - name: Branch name and commit convention
         run: ./scripts/check-naming.sh "${{ github.head_ref }}" "${{ github.event.pull_request.base.sha }}"
-
-      - name: The process the prompts describe is the process they run
-        run: ./scripts/check-prompts.sh
 
   tasks:
     name: Tasks complete
