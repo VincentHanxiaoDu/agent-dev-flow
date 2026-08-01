@@ -44,8 +44,12 @@ body:
 **Dependencies are the parent's second pass, not a sub-agent's section.** Filing simultaneously means
 no sub-agent knows another's number. **Do the second pass when one Issue's answer constrains
 another's** — a shared decision, an ordering that is real. Skip it when they only sit near each
-other. **Record it by editing both bodies**, where a builder reads them; a comment is where it goes
-to be missed.
+other. **Record it by editing both bodies**, where a builder reads them; a comment is where it goes to be
+missed:
+
+```bash
+gh api -X PATCH "repos/$REPO/issues/<n>" -f body="$(cat body.md)"
+```
 
 **`<scope>`** is one lowercase word for the area — `display`, `combat`, `store`. **Choose the vocabulary
 once, before fanning out, and hand the list to every sub-agent** — left to themselves they produce
@@ -83,6 +87,10 @@ REPO=$(git config --get remote.origin.url | sed -E 's#^(https://[^/]+/|git@[^:]+
 gh api "repos/$REPO/labels" --jq '[.[].name]'            # a missing label 422s the whole POST
 gh api "repos/$REPO/issues?state=open" --jq '.[].title'   # what is already filed
 ```
+
+**Every label §3 names must be in that list.** A fresh repository has GitHub's defaults and none of
+ours, so the whole fan-out 422s at once — create the missing one or stop, but do not discover it
+per sub-agent.
 
 **Skip a capability that already has an Issue.** Run twice on one specification, this files the whole
 set again — and a duplicate board is harder to clean than it was to create.
