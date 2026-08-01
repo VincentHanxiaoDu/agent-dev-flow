@@ -22,10 +22,10 @@ else
   # Piped from curl: fetch a tarball rather than requiring git.
   TMP=$(mktemp -d)
   cleanup() { rm -rf "$TMP"; }
-  echo "fetching $REPO_URL @ $REF"
+  echo "fetching ${REPO_URL#https://github.com/} @ $REF"
   curl -fsSL "$REPO_URL/archive/refs/heads/$REF.tar.gz" | tar -xz -C "$TMP" --strip-components=1 || {
     echo "error: could not fetch the framework from $REPO_URL @ $REF." >&2
-    echo "  This is a DOWNLOAD failure and not a statement that the framework is unavailable." >&2
+    echo "  This is a DOWNLOAD failure and NOT a statement that the framework does not exist." >&2
     exit 1; }
   SRC="$TMP/framework"
 fi
