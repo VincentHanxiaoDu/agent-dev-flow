@@ -63,7 +63,17 @@ do_state() {
   resolve_repo
   sha=$(gh api "repos/$REPO/pulls/$num" --jq .head.sha 2>/dev/null) || {
     echo "::error::could not read pull request #$num. This is a LOOKUP FAILURE and NOT a statement about its state." >&2; exit 1; }
-  [ -n "$brief" ] || echo "PR #$num  head $(printf '%s' "$sha" | cut -c1-8)"
+  # A HEAD THAT IS NOT YOUR HEAD MUST SAY SO. For about a minute after a force-push this reported
+  # the PREVIOUS commit and its verdicts, with nothing marking them as another commit's. An agent
+  # that trusts the first reading acts on the result of work it has already replaced.
+  local localsha warn=""
+  localsha=$(git rev-parse HEAD 2>/dev/null || echo "")
+  if [ -n "$localsha" ] && [ "$localsha" != "$sha" ] \
+     && git merge-base --is-ancestor "$sha" "$localsha" 2>/dev/null; then
+    warn="  <- NOT your HEAD ($(printf '%s' "$localsha" | cut -c1-8)); these verdicts are an older commit's"
+  fi
+  [ -n "$brief" ] || echo "PR #$num  head $(printf '%s' "$sha" | cut -c1-8)$warn"
+  [ -z "$brief" ] || [ -z "$warn" ] || printf 'STALE HEAD — the API still has %s, not your %s\n' "$(printf '%s' "$sha" | cut -c1-8)" "$(printf '%s' "$localsha" | cut -c1-8)"
 
   runs=$(gh api "repos/$REPO/commits/$sha/check-runs" 2>/dev/null) || {
     echo "::error::could not read check runs — not a green." >&2; exit 1; }
@@ -92,6 +102,17 @@ do_state() {
   badst=$(printf '%s' "$st"   | jq -r '[.statuses[]? | select(.state=="failure" or .state=="error") | .context] | join(", ")')
   local pending
   pending=$(printf '%s' "$runs" | jq '[.check_runs[]? | select(.status!="completed")] | length')
+  # NO CHECKS AT ALL IS NOT A GREEN. It printed "(none yet — CI may not have started)" and then
+  # "all green." on the same run — two lines contradicting each other, and `all green` is the string
+  # an agent greps for. The tool that enforces "could not determine is not determined to be nothing"
+  # was breaking that rule itself.
+  local total
+  total=$(printf '%s' "$runs" | jq '[.check_runs[]?] | length')
+  if [ "$total" -eq 0 ] && [ "$(printf '%s' "$st" | jq '[.statuses[]?] | length')" -eq 0 ]; then
+    if [ -n "$brief" ]; then printf 'NO ANSWER YET — nothing has reported on this head\n'; else
+      echo; echo "  NOTHING HAS REPORTED on this head yet. That is not a pass — it is no answer."; fi
+    return 2
+  fi
   if [ -n "$brief" ]; then
     if [ -n "$badruns" ] || [ -n "$badst" ]; then
       printf 'RED %s\n' "$(printf '%s %s' "$badruns" "$badst" | sed 's/^ *//; s/ *$//')"; return 1

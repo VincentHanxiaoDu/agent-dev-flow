@@ -46,6 +46,8 @@ and route it onward.
 - **Run it.** Reading the diff is not verification.
 - ***Could not determine* and *determined to be nothing* must never share an exit code.**
 - **Only what the Issue asked.** Declare any widening in the PR body.
+- **Every commit ends with `Agent: <your role>`.** The review gate reads it to work out who built
+  this; without it no reviewer can be shown to be independent. `run-gates.sh` catches a missing one.
 - **Tick a task when it is done, never to clear a gate.** Work that did not happen gets the list
   trimmed and the remainder filed.
 

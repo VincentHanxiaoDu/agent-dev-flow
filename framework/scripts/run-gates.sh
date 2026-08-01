@@ -83,6 +83,17 @@ if [ "$branch" = HEAD ]; then
   echo "note: detached HEAD; taking the branch as '$branch'"
 fi
 
+# THE GATES READ COMMITS, SO UNCOMMITTED WORK IS INVISIBLE TO THEM. Run before committing, this
+# reported `branch and commits: ok` for a commit that did not exist yet, and CI then failed on the
+# trailer the uncommitted message was missing — costing a force-push, which is the one thing the
+# instructions warn destroys a review.
+if ! git diff --quiet HEAD 2>/dev/null || [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
+  echo "::error::this working tree has changes that are not committed, and every gate here reads COMMITS." >&2
+  echo "  A pass would be about the last commit, not about your work. Commit first, then run this." >&2
+  git status --short | sed 's/^/    /' >&2
+  exit 1
+fi
+
 base=$(git merge-base "$base_ref" HEAD) || {
   echo "::error::could not resolve a merge base against $base_ref. Fetch it first — this is a lookup failure and not a verdict about anything." >&2; exit 1; }
 
