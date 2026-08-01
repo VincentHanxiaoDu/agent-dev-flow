@@ -59,16 +59,64 @@ resolve_repo() {
 # had headroom, and `gh issue list` returned an EMPTY FILE rather than an error when that happened.
 issues() { resolve_repo; api --paginate "repos/$REPO/issues?state=open&per_page=100"; }
 
-emit() { # emit <heading> <jq-filter>
-  local head=$1 filter=$2 out
+emit() { # emit <heading> <jq-filter> [--unclaimed]
+  local head=$1 filter=$2 skip=${3:-} out
   out=$(printf '%s' "$ALL" | jq -r "$filter" 2>/dev/null || true)
+  # AN ISSUE SOMEBODY IS ALREADY ON IS NOT WORK TO START. Dropped rather than hidden: the count is
+  # printed, because "nothing here" and "three of these are in flight" are different answers.
+  if [ "$skip" = "--unclaimed" ] && [ -n "${CLAIMED:-}" ]; then
+    local before after
+    before=$(printf '%s\n' "$out" | grep -c . || true)
+    out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$CLAIMED" | tr '\n' '|' | sed 's/|$//'))  " || true)
+    after=$(printf '%s\n' "$out" | grep -c . || true)
+    [ "$before" -eq "$after" ] || head="$head  ($((before - after)) already have a branch — not shown)"
+  fi
   printf '\n%s\n' "$head"
   if [ -n "$out" ]; then printf '%s\n' "$out"; else printf '  (none)\n'; fi
+}
+
+# YOUR OWN PULL REQUESTS, AND WHICH OF THEM NEED YOU. Without this a role has to call three
+# separate things to work out what to do next, and the previous build showed what happens then: an
+# agent fixed the one red it had been told about and never saw the one blocking the merge.
+#
+# THE VERDICT IS COMPUTED BY pr.sh, NOT RE-IMPLEMENTED HERE. It reads both the check runs and the
+# commit statuses, and duplicating that logic is how the two answers drift apart.
+my_prs() {
+  local role=$1 prs line num branch st
+  # RESOLVED HERE TOO. `issues()` calls resolve_repo inside a command substitution, so REPO is set in
+  # a subshell that has already exited — the variable is unset by the time this runs. Found by
+  # running it, not by reading it.
+  resolve_repo
+  prs=$(api --paginate "repos/$REPO/pulls?state=open&per_page=100")
+  printf '\nYOUR PULL REQUESTS:\n'
+  local any=0
+  while IFS=$'\t' read -r num branch title; do
+    [ -n "$num" ] || continue
+    case "$branch" in "$role"/*) : ;; *) continue ;; esac
+    any=1
+    st=$("$(dirname "${BASH_SOURCE[0]}")/pr.sh" state "$num" --brief 2>&1) || true
+    printf '  #%-4s %-46s %s\n' "$num" "$(printf '%s' "$title" | cut -c1-46)" "$st"
+  done < <(printf '%s' "$prs" | jq -r '.[] | [.number, .head.ref, .title] | @tsv' 2>/dev/null || true)
+  [ "$any" -eq 1 ] || printf '  (none)\n'
+}
+
+# WHAT IS ALREADY CLAIMED, DERIVED FROM THE BRANCH NAMES. `<role>/<type>/<issue>-<slug>` carries the
+# Issue number, so a branch existing IS the claim — there is no label to set, no comment to post and
+# nothing to expire. State is stored once, which is the whole reason the naming convention is a gate.
+#
+# Without this two agents of the same role both take the same Issue: it stayed in "to resolve" while
+# its own pull request was open two lines below, which is what running it showed.
+claimed_issues() {
+  resolve_repo
+  api --paginate "repos/$REPO/branches?per_page=100" \
+    | jq -r '.[].name' 2>/dev/null \
+    | sed -n 's#^[a-z]*/[a-z]*/\([0-9][0-9]*\)-.*#\1#p' | sort -u
 }
 
 role_queue() {
   local role=$1
   ALL=$(issues | jq -s 'add // []')
+  CLAIMED=$(claimed_issues)
 
   case "$role" in
     dev)
@@ -76,17 +124,20 @@ role_queue() {
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | any(startswith("type:")))
              | select([.labels[].name] | index("blocked") | not)
-             | "  #\(.number)  \(.title)"' ;;
+             | "  #\(.number)  \(.title)"' --unclaimed
+      my_prs dev ;;
     qa)
       emit "BUGS AND CHORES TO VERIFY, MERGE AND CLOSE:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | index("type:bug") or index("type:chore"))
-             | "  #\(.number)  \(.title)"' ;;
+             | "  #\(.number)  \(.title)"' --unclaimed
+      my_prs qa ;;
     product)
       emit "FEATURES TO UAT, ARCHIVE, MERGE AND CLOSE:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | index("type:feature"))
-             | "  #\(.number)  \(.title)"' ;;
+             | "  #\(.number)  \(.title)"' --unclaimed
+      my_prs product ;;
     ops)
       emit "OPEN PULL REQUESTS — CI and gate health:" \
         '.[] | select(.pull_request!=null) | "  #\(.number)  \(.title)"' ;;
