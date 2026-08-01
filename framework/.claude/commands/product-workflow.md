@@ -48,7 +48,9 @@ someone to tell you twice.
 
 ## 4. UAT
 
-**Drive the acceptance criteria against a build from the branch.** Not the diff, not the author's
+**Drive the acceptance criteria against a build from the branch, in a clean checkout.** A working
+clone can carry uncommitted edits that are nobody's intent — `git worktree add` gives you a tree
+that is only what the branch says. Not the diff, not the author's
 report, not a green check.
 
 - **Never rewrite a criterion to match what shipped.** If a criterion names a command that does not
@@ -65,11 +67,19 @@ report, not a green check.
 | **Tasks complete** | Every task ticked. dev should have done this; **if a box is open, the work is not finished and UAT is premature** — send it back rather than pass it. |
 | **Generated files not hand-authored** | `openspec/specs/**` changes **only** through archiving. An edit arriving without one fails. |
 
-## 6. On an OpenSpec project, archive before the merge
+## 6. On an OpenSpec project, archive — and expect it to cost a review round
 
 ```bash
 openspec archive <change>
 ```
+
+**Archiving is a commit, and a commit invalidates the review.** A pull request reaches you already
+approved, so pushing the archive moves the head sha and the review status does not follow it. That
+is not a defect to route around — it is a second reviewer looking at a second change.
+
+So: **archive on the branch, then ask for a re-review, then merge.** One extra round, and the
+alternative is worse — merging first leaves `main` claiming a change is in flight that has already
+shipped, and a tag cut on that tree disagrees with its own history.
 
 **In the same pull request as the merge.** Archiving is what "finished" looks like in a diff, and
 splitting it into a follow-up leaves `main` claiming work is in flight that has shipped.

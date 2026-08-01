@@ -81,18 +81,23 @@ emit() { # emit <heading> <jq-filter> [--unclaimed]
 #
 # THE VERDICT IS COMPUTED BY pr.sh, NOT RE-IMPLEMENTED HERE. It reads both the check runs and the
 # commit statuses, and duplicating that logic is how the two answers drift apart.
+# WHICH PULL REQUESTS ARE MINE IS NOT ALWAYS "THE ONES I AUTHORED". dev owns the branches it wrote;
+# product owns the FEATURE pull requests whoever wrote them, because UAT is done on somebody else's
+# branch. Filtering product by a `product/*` prefix returned (none) for a round whose entire workload
+# was two dev branches — a successful lookup that filtered the answer away, which is worse than a
+# failed one because the exit code is 0.
 my_prs() {
-  local role=$1 prs line num branch st
+  local match=$1 heading=${2:-YOUR PULL REQUESTS} prs line num branch st
   # RESOLVED HERE TOO. `issues()` calls resolve_repo inside a command substitution, so REPO is set in
   # a subshell that has already exited — the variable is unset by the time this runs. Found by
   # running it, not by reading it.
   resolve_repo
   prs=$(api --paginate "repos/$REPO/pulls?state=open&per_page=100")
-  printf '\nYOUR PULL REQUESTS:\n'
+  printf '\n%s:\n' "$heading"
   local any=0
   while IFS=$'\t' read -r num branch title; do
     [ -n "$num" ] || continue
-    case "$branch" in "$role"/*) : ;; *) continue ;; esac
+    case "$branch" in $match) : ;; *) continue ;; esac
     any=1
     st=$("$(dirname "${BASH_SOURCE[0]}")/pr.sh" state "$num" --brief 2>&1) || true
     printf '  #%-4s %-46s %s\n' "$num" "$(printf '%s' "$title" | cut -c1-46)" "$st"
@@ -125,19 +130,19 @@ role_queue() {
              | select([.labels[].name] | any(startswith("type:")))
              | select([.labels[].name] | index("blocked") | not)
              | "  #\(.number)  \(.title)"' --unclaimed
-      my_prs dev ;;
+      my_prs "dev/*" ;;
     qa)
       emit "BUGS AND CHORES TO VERIFY, MERGE AND CLOSE:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | index("type:bug") or index("type:chore"))
-             | "  #\(.number)  \(.title)"' --unclaimed
-      my_prs qa ;;
+             | "  #\(.number)  \(.title)"' 
+      my_prs "*" "PULL REQUESTS TO VERIFY (bug/chore), whoever wrote them" ;;
     product)
       emit "FEATURES TO UAT, ARCHIVE, MERGE AND CLOSE:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | index("type:feature"))
-             | "  #\(.number)  \(.title)"' --unclaimed
-      my_prs product ;;
+             | "  #\(.number)  \(.title)"' 
+      my_prs "*" "PULL REQUESTS TO UAT, whoever wrote them" ;;
     ops)
       emit "OPEN PULL REQUESTS — CI and gate health:" \
         '.[] | select(.pull_request!=null) | "  #\(.number)  \(.title)"' ;;

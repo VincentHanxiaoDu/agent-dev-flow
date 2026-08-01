@@ -61,9 +61,26 @@ self_test() {
 base_ref=${1:-origin/main}
 branch=$(git rev-parse --abbrev-ref HEAD)
 if [ "$branch" = HEAD ]; then
-  # A detached HEAD is how a reviewer checks out a PR, and reviewers are intended users.
-  branch=$(gh pr view --json headRefName -q .headRefName 2>/dev/null || true)
-  [ -n "$branch" ] || { echo "::error::HEAD is detached and this commit belongs to no branch this clone knows. That is a checkout problem, not a finding." >&2; exit 1; }
+  # A DETACHED HEAD IS HOW A REVIEWER CHECKS OUT A PULL REQUEST, and reviewers are intended users.
+  # This refused on every such checkout: the only recovery was `gh pr view`, which is GraphQL and
+  # dead the moment that quota runs out — so the fallback failed exactly when it was needed. A
+  # reviewer reported having to invent `git checkout -B` to get past a check "protecting against
+  # nothing a reviewer does wrong".
+  #
+  # Any ref pointing at this commit answers it, and REST answers it when git cannot.
+  branch=$(git for-each-ref --format='%(refname:short)' --points-at HEAD refs/heads refs/remotes 2>/dev/null \
+           | sed 's#^origin/##' | grep -vx HEAD | head -1)
+  if [ -z "$branch" ]; then
+    repo=$(git config --get remote.origin.url 2>/dev/null | sed -E 's#^(https://[^/]+/|git@[^:]+:)##; s#\.git$##')
+    [ -n "$repo" ] && branch=$(gh api "repos/$repo/commits/$(git rev-parse HEAD)/pulls" \
+      -H "Accept: application/vnd.github.groot-preview+json" --jq '.[0].head.ref' 2>/dev/null || true)
+  fi
+  [ -n "$branch" ] && [ "$branch" != null ] || {
+    echo "::error::HEAD is detached and no branch or pull request in this repository points at $(git rev-parse --short HEAD)." >&2
+    echo "  That is a checkout problem, not a finding about this code. Check out the branch, or pass" >&2
+    echo "  the name: run-gates.sh <base-ref> does not carry it." >&2
+    exit 1; }
+  echo "note: detached HEAD; taking the branch as '$branch'"
 fi
 
 base=$(git merge-base "$base_ref" HEAD) || {
