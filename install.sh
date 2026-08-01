@@ -270,5 +270,10 @@ if [ "$protect" != yes ]; then
   echo "  - protect the default branch on the contexts above, or re-run with --protect."
   echo "    Until then every gate is advisory and the process enforces nothing."
 fi
+if [ ! -d "$target/openspec" ]; then
+  echo "  - OPTIONAL: run 'openspec init --tools claude .' if you want spec-driven changes."
+  echo "    Two gates read openspec/ and both pass, saying NOT APPLICABLE, while it is absent."
+  echo "    With it, dev writes a change per Issue and product archives before the merge."
+fi
 echo "  - put this project's own instructions in .workflow/<role>/AGENT.md — build commands,"
 echo "    domain vocabulary, conventions a newcomer gets wrong. The framework never touches those." 

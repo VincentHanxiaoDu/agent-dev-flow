@@ -40,7 +40,25 @@ someone to tell you twice.
 
 **When an event lands, work it the same way — fan out, do not queue behind yourself.**
 
-## 3. Work all of it in parallel
+## 3. If this project uses OpenSpec
+
+`openspec/` present means every Issue gets a change directory, and the gates read it:
+
+```
+openspec/changes/<slug>/
+  proposal.md   why, and what changes
+  tasks.md      - [ ] one line per task
+```
+
+**Tick a task when it is done, never to clear a gate.** `Tasks complete` fails on an unticked box,
+and the honest fix for work that did not happen is to trim the list and file the remainder.
+
+You do not archive. That is product's, after UAT, in the same pull request.
+
+**No `openspec/` directory means this does not apply** — the gate says NOT APPLICABLE and passes.
+Do not create one to satisfy it.
+
+## 4. Work all of it in parallel
 
 **One sub-agent per Issue, started together.** Not the first, not the most important — every Issue that does not contend with another. **Two Issues serialise only if they edit the same file. No cap on width.**
 
@@ -51,14 +69,14 @@ git worktree add ../wt-<issue> -b dev/<type>/<issue>-<slug> origin/main
 Each sub-agent gets its Issue number, worktree, scope and acceptance criteria. **It cannot ask you
 questions**, so everything it needs goes in what you hand it.
 
-## 4. Principles
+## 5. Principles
 
 - **Break the test and watch it go red.** A test you have not seen fail is not a test.
 - **Run it.** Reading the diff is not verification.
 - ***Could not determine* and *determined to be nothing* must never share an exit code.**
 - **Only what the Issue asked.** Declare any widening in the PR body.
 
-## 5. Ship it
+## 6. Ship it
 
 ```bash
 ./scripts/run-gates.sh          # do not assemble the invocation from memory
@@ -66,7 +84,7 @@ questions**, so everything it needs goes in what you hand it.
 
 Open the PR, arm auto-merge, **read back that it armed** — the CLI exits 0 while refusing.
 
-## 6. Not yours
+## 7. Not yours
 
 **You close nothing. You merge nothing. You do not review your own work.**
 

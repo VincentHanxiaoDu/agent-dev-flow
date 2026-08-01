@@ -68,6 +68,15 @@ run_check() {
       || { echo "::error::$role.md does not state that $role closes nothing" >&2; rc=1; }
   done
 
+  # A GATE MUST HAVE A PROMPT THAT PRODUCES WHAT IT CHECKS. Two CI gates read `openspec/`, and for
+  # a while no role prompt mentioned openspec at all — so nothing would ever create a change, the
+  # gates would pass vacuously forever, and a gate that can never fire is not a gate. This is the
+  # inverse of a rule nothing enforces: enforcement of a workflow nobody was told to follow.
+  grep -qi 'openspec' "$dir/dev-workflow.md" 2>/dev/null \
+    || { echo "::error::dev-workflow.md never mentions openspec, but a CI gate reads openspec/changes — nothing would create what it checks" >&2; rc=1; }
+  grep -qi 'openspec archive' "$dir/product-workflow.md" 2>/dev/null \
+    || { echo "::error::product-workflow.md does not say to archive, but a CI gate fails a spec edit that arrives without one" >&2; rc=1; }
+
   # WRITING REQUIREMENTS: a criterion that can be softened to make it reachable is not a criterion,
   # and the previous build produced one Issue carrying 247 of them in a single milestone.
   grep -qi 'testable or it is not a criterion' "$dir/create-feature.md" 2>/dev/null \
