@@ -82,6 +82,41 @@ done
 
 printf 'ref=%s\n' "$REF" > "$target/.agent-dev-flow"
 
+# --- the labels the queue routes on --------------------------------------------------------
+# CREATED HERE, BECAUSE A MISSING LABEL IS AN INVISIBLE ISSUE. The queue routes on `type:` and the
+# product/machinery ratio counts `area:` — an Issue carrying neither is in no role's queue and in no
+# count, so it is not merely unrouted, it is unseen. Asking a person to paste five API calls is a
+# step that gets skipped, and what it costs is silent.
+label() { # label <name> <colour> <description>
+  gh api -X POST "repos/$SLUG/labels" -f name="$1" -f color="$2" -f description="$3" >/dev/null 2>&1 && echo "  + label $1" && return 0
+  # Already there is success. Anything else is not, and must say so rather than look like success.
+  gh api "repos/$SLUG/labels/$1" >/dev/null 2>&1 && { echo "  = label $1 (exists)"; return 0; }
+  echo "  ! label $1 COULD NOT BE CREATED" >&2; return 1
+}
+
+SLUG=$(cd "$target" && git config --get remote.origin.url 2>/dev/null | sed -E 's#^(https://[^/]+/|git@[^:]+:)##; s#\.git$##' || echo "")
+echo
+if [ -z "$SLUG" ]; then
+  echo "no 'origin' remote here, so the labels were NOT created. They are not optional — an Issue"
+  echo "with no type: label is in no role's queue, and one with no area: label is in no count."
+  echo "Add a remote and re-run this installer, or create them by hand."
+elif ! command -v gh >/dev/null 2>&1; then
+  echo "gh is not installed, so the labels were NOT created. See above for why they matter."
+else
+  echo "labels on $SLUG:"
+  lrc=0
+  label type:feature   0E8A16 "A capability a person can use" || lrc=1
+  label type:bug       D73A4A "Something does not do what it says" || lrc=1
+  label type:chore     BFD4F2 "Work with no user-visible change" || lrc=1
+  label area:product   0E8A16 "The thing being built" || lrc=1
+  label area:machinery FBCA04 "Gates, CI, tooling — not the product" || lrc=1
+  [ "$lrc" -eq 0 ] || {
+    echo "  at least one label could not be created — most likely 'gh auth login' has not been run," >&2
+    echo "  or this token cannot write to $SLUG. The install itself succeeded; routing will not work" >&2
+    echo "  until these exist." >&2
+  }
+fi
+
 # --- verify, rather than assume the copy was faithful ------------------------
 echo
 ( cd "$target" && ./scripts/check-prompts.sh ) || {
