@@ -27,8 +27,10 @@ pull request can be red for more than one reason at once.
 **One sub-agent per Issue, started together.** Not the first, not the most important. **Two Issues
 serialise only if they edit the same file. No cap on width.**
 
-**You create the worktrees, before fanning out** — concurrent `git worktree add` races on the index
-lock.
+**You create the worktrees for the Issues that will run concurrently, before fanning out** —
+concurrent `git worktree add` races on the index lock. **A stacked branch is cut later**, from the
+commit it stacks on, which does not exist yet: pre-creating it from `origin/main` hands two
+sub-agents the same file and produces the conflict stacking exists to prevent.
 
 ```bash
 git worktree add "../$(basename "$PWD")-wt-<issue>" -b dev/<type>/<issue>-<slug> origin/main
