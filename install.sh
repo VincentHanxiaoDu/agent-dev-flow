@@ -185,11 +185,17 @@ echo
 ( cd "$target" && ./scripts/queue.sh --self-test >/dev/null ) || {
   echo "error: queue.sh's self-test fails here. Refusing to report a successful install." >&2; exit 1; }
 
-# THE REQUIRED CONTEXTS ARE READ FROM THE INSTALLED WORKFLOW, never restated here. They were
-# restated once, and the copy named a fifth context no job produced — anyone following those
+# READ FROM THE WORKFLOW'S OWN DECLARATION, not from its job names. Job names were the first
+# source, and they are the WRONG source: a job's name and the context it publishes are different
+# strings, so renaming one job protected `main` on "Review gate ran" — green whenever the job
+# executes — while the verdict was required by nothing, and a pull request merged with its review
+# red. check-contexts.sh proves every declared context is really produced.
+#
+# An earlier version restated the list by hand, and that copy named a context no job produced — anyone following those
 # instructions would have protected `main` on a check that never arrives, and every pull request
 # would have waited on it forever. A list that can drift from the thing it describes will.
-CONTEXTS=$(sed -n 's/^    name: /       /p' "$target/.github/workflows/gates.yml" 2>/dev/null || echo "")
+CONTEXTS=$(sed -n '/# BEGIN REQUIRED CONTEXTS/,/# END REQUIRED CONTEXTS/p' "$target/.github/workflows/gates.yml" 2>/dev/null \
+           | sed -n 's/^#   /       /p' || echo "")
 [ -n "$CONTEXTS" ] || {
   echo "error: could not read the job names from the installed workflow, so the list of required" >&2
   echo "       contexts cannot be printed. Refusing to guess: a wrong list protects main on a check" >&2

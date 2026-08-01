@@ -8,6 +8,23 @@ name: gates
 # file has reached the default branch, posting a review will not re-evaluate the gate by itself;
 # re-run the pull request's own run instead.
 
+# REQUIRED CONTEXTS — the exact strings branch protection must require. Declared here because a
+# job NAME and the context a job PUBLISHES are not the same string, and deriving the list from job
+# names got that wrong the moment one was renamed: `main` ended up protected on "Review gate ran",
+# which is green whenever the job executes, while the verdict it publishes was required by nothing.
+# A pull request merged with its review status red and the protection was working as configured.
+#
+# One line per context, exactly as it appears to GitHub. check-contexts.sh proves each one is
+# actually produced by this file.
+#
+# BEGIN REQUIRED CONTEXTS
+#   Branch name and commit convention
+#   Tasks complete
+#   Generated files not hand-authored
+#   Build and tests
+#   Reviewed by an agent that authored none of its commits
+# END REQUIRED CONTEXTS
+
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -103,10 +120,23 @@ jobs:
           set -euo pipefail
           if [ -f Makefile ] && grep -qE '^ci:' Makefile; then
             make ci
-          else
-            echo "NOT APPLICABLE: no 'ci' target in a Makefile, so nothing was built or tested here."
-            echo "This green means the gate did not apply. It does NOT mean the tests passed."
+            exit $?
           fi
+          # A PROJECT WITH TESTS AND NO WAY TO RUN THEM MUST NOT BE GREEN HERE. Without this, a
+          # repository with no Makefile printed NOT APPLICABLE and went green having executed zero
+          # tests — and a dev agent shipped three test suites that never ran, behind three green
+          # checks. Its own words: the exact failure class the framework is built against, sitting
+          # in the framework.
+          if find . -path ./node_modules -prune -o \
+               \( -name '*_test.*' -o -name 'test_*' -o -name '*.test.*' -o -name '*.spec.*' \) -print 2>/dev/null | grep -q . \
+             || [ -d tests ] || [ -d test ] || [ -d spec ]; then
+            echo "::error::this project has tests and no 'ci' target to run them, so none of them ran."
+            echo "  Add a Makefile with a 'ci:' target that runs your suite. A green here would say"
+            echo "  the tests passed, and nothing would have executed them."
+            exit 1
+          fi
+          echo "NOT APPLICABLE: no tests found and no 'ci' target, so nothing was built or tested."
+          echo "This green means the gate did not apply. It does NOT mean tests passed."
 
   # ── the review gate: both event paths, one commit status ─────────────────────
   review:

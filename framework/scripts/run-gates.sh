@@ -114,6 +114,7 @@ if [ -d ".claude/commands" ]; then
 else
   printf '  --    prompts (no .claude/commands here — local-only and gitignored, so not checked)\n'
 fi
+run "contexts"        "$here/check-contexts.sh"
 run "queue"           "$here/queue.sh"        --self-test
 run "queue watch"     "$here/watch-queue.sh"  --self-test
 run "PR watch"        "$here/watch-prs.sh"    --self-test
