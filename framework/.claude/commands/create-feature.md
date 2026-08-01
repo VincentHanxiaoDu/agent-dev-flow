@@ -16,6 +16,9 @@ different abilities, cut it. If two Issues can only ever be used together, they 
 A behaviour that is a *constraint* on a capability — a number always being visible, a screen size —
 belongs inside the Issue it constrains, where it can be driven. It is not its own Issue.
 
+**A principle constraining EVERY capability goes into every Issue**, as a criterion each can be
+driven against alone. Filed once, it is nobody's to satisfy.
+
 ## 2. Open questions are not requirements — and you never answer one
 
 A specification usually contains decisions nobody has made yet. **This is where two runs of this
@@ -41,7 +44,8 @@ body:
 **Dependencies are the parent's second pass, not a sub-agent's section.** Filing simultaneously means
 no sub-agent knows another's number. **Do the second pass when one Issue's answer constrains
 another's** — a shared decision, an ordering that is real. Skip it when they only sit near each
-other.
+other. **Record it by editing both bodies**, where a builder reads them; a comment is where it goes
+to be missed.
 
 **`<scope>`** is one lowercase word for the area — `display`, `combat`, `store`. **Choose the vocabulary
 once, before fanning out, and hand the list to every sub-agent** — left to themselves they produce
@@ -83,8 +87,8 @@ gh api "repos/$REPO/issues?state=open" --jq '.[].title'   # what is already file
 **Skip a capability that already has an Issue.** Run twice on one specification, this files the whole
 set again — and a duplicate board is harder to clean than it was to create.
 
-Then **one sub-agent per capability, started together. No cap on width** — though at two or three
-capabilities, writing them yourself is faster than briefing anyone. Give each its capability,
+**At two or three capabilities, write them yourself** — briefing a sub-agent costs more than the
+work. Above that, **one per capability, started together. No cap on width.** Give each its capability,
 the shared scope vocabulary, and the specification. **Tell each to return its Issue number and every
 open question it recorded** — you cannot report on a body you did not write.
 
