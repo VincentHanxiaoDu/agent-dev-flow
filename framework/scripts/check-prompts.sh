@@ -74,6 +74,13 @@ run_check() {
     || { echo "::error::create-feature.md does not require criteria to be testable" >&2; rc=1; }
   grep -qi 'never soften' "$dir/create-feature.md" 2>/dev/null \
     || { echo "::error::create-feature.md does not forbid softening a criterion to make it reachable" >&2; rc=1; }
+  # AN OPEN QUESTION IS NOT A REQUIREMENT. Measured by driving this command against a real
+  # specification: the instructions said nothing about decisions the spec had not made, and the
+  # agent reported it as the most likely place two runs diverge — one would file the question as an
+  # Issue, another would quietly pick an answer and write it as a criterion, where it stops looking
+  # like a guess.
+  grep -qi 'never answer one\|do not invent an answer' "$dir/create-feature.md" 2>/dev/null \
+    || { echo "::error::create-feature.md does not forbid answering the specification's open questions" >&2; rc=1; }
 
   # RELEASING: product decides, ops executes; and an unnamed defect is not shippable.
   grep -qi 'product decides' "$dir/release-version.md" 2>/dev/null \
