@@ -145,6 +145,18 @@ do_rereview() {
   resolve_repo
   sha=$(gh api "repos/$REPO/pulls/$num" --jq .head.sha 2>/dev/null) || {
     echo "::error::could not read pull request #$num — this is a LOOKUP FAILURE, not a request sent." >&2; exit 1; }
+  # A REQUEST NAMING THE WRONG SHA SENDS A REVIEWER TO THE WRONG COMMIT. Called straight after a
+  # push, this raced it and asked for a re-review of the commit that had just been replaced —
+  # `state` warns about a stale head and this did not.
+  local localsha
+  localsha=$(git rev-parse HEAD 2>/dev/null || echo "")
+  if [ -n "$localsha" ] && [ "$localsha" != "$sha" ] \
+     && git merge-base --is-ancestor "$sha" "$localsha" 2>/dev/null; then
+    echo "::error::the API still has $(printf '%s' "$sha" | cut -c1-8); your HEAD is $(printf '%s' "$localsha" | cut -c1-8)." >&2
+    echo "  Nothing was sent. Push, wait a moment, and ask again — a request naming the wrong commit" >&2
+    echo "  sends the reviewer to work you have already replaced." >&2
+    exit 1
+  fi
   local body="/tmp/.rereview-$num.md"
   {
     printf '**Re-review requested — the head has moved to `%s`.**\n\n' "$(printf '%s' "$sha" | cut -c1-8)"
