@@ -32,14 +32,14 @@ gh api "repos/$REPO/issues/<n>/comments"           # prior reviews and the autho
 out from a red status wastes the whole review:
 
 ```bash
-git log --format='%b' $(git merge-base origin/main <branch>)..<branch> | grep '^Agent:'
+git log --format='%b' $(git merge-base origin/main origin/<branch>)..origin/<branch> | grep '^Agent:'
 ```
 
 **Diff from the merge base, not the tip:**
 
 ```bash
-git diff origin/main..<branch>                                   # WRONG
-git diff $(git merge-base origin/main <branch>)..<branch>        # right
+git diff origin/main..origin/<branch>                                          # WRONG
+git diff $(git merge-base origin/main origin/<branch>)..origin/<branch>        # right
 ```
 
 The wrong one is the one that comes naturally, and on a branch cut before something else landed it
@@ -55,17 +55,21 @@ shows that thing as **deleted** — a serious false finding about work nobody di
 - **Run a control on any empty result.** Point the same query at something you know exists. A broken
   pattern and a genuine absence look identical.
 - **Work in your own worktree or a fresh clone.** Other roles are in this repository now.
+  **Do not delete the working directory to make one.** `.claude/commands/` — including this file —
+  is gitignored, so it exists only there; a clone does not carry it and `rm -rf` destroys it.
 
 ## 4. What to look for that a gate cannot
 
 - **A decision quietly settled.** If the Issue carries `## Blocked on a decision`, check the branch
   did not answer it — **in a test as well as in the code**. A test that pins undecided behaviour
   makes it binding no matter what the pull request body claims.
+  **The method: land each open decision the other way and see whether the suite objects.** If it
+  goes red on a legal answer, the branch has chosen one.
 - **And the inverse: a settled criterion left unpinned.** On a branch that mostly refuses, the
   blocked path and the working path can satisfy the same assertions — both non-zero, both empty on
   stdout — so the criterion the branch exists for is untested and deleting it changes nothing.
-  **Mutate the settled behaviour away and see whether anything goes red.** This is the dominant
-  failure mode on such a branch, and it is not the pinning one.
+  **Mutate the settled behaviour away and see whether anything goes red.** Both this and the
+  pinning above are live on any branch that mostly refuses; neither is the likelier one.
 - **A check that reports success having examined nothing.** *Could not determine* and *determined to
   be nothing* must never share an exit code.
 - **Widening.** Compare what changed against what the Issue asked.
@@ -120,6 +124,10 @@ note is a claim. Unaddressed items from the previous reviewer carry forward unle
 them.
 
 ## 8. Refuse it if it is wrong
+
+**An unavoidable choice forced by contradictory criteria is not a refusal reason** — provided it is
+marked provisional and no test pins it. Say it is a specification bug and name the contradiction; the
+branch cannot fix a criterion.
 
 A `changes-requested` **with a stated remedy** is a better outcome than a rubber stamp — a finding
 that names the fix is one commit away from closed; one that only names the problem is a negotiation.
