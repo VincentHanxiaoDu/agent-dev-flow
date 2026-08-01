@@ -167,6 +167,15 @@ do_rereview() {
 do_arm() {
   local num=$1 out armed
   resolve_repo
+  # A REPOSITORY-WIDE SETTING IS NOT A PER-PULL-REQUEST FAILURE. Where auto-merge is disabled this
+  # reported NOT ARMED on every pull request forever, which reads as something to fix and is not —
+  # and the comment an agent then posted to explain it cancelled that PR'"'"'s own CI run. Asked once,
+  # up front, so the answer is "not available here" rather than a recurring red herring.
+  if [ "$(gh api "repos/$REPO" --jq .allow_auto_merge 2>/dev/null)" = "false" ]; then
+    echo "NOT APPLICABLE: this repository has auto-merge disabled, so no pull request can be armed."
+    echo "  A verifier merges by hand. This is a repository setting, not something about #$num."
+    return 0
+  fi
   # `gh pr merge --auto` is GraphQL and exits 0 while refusing, so the read-back below is the check,
   # not this call.
   out=$(gh pr merge "$num" --auto --squash 2>&1) || true

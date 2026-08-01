@@ -38,7 +38,11 @@ on:
     types: [created, edited]
 
 concurrency:
-  group: gates-${{ github.event.pull_request.number || github.event.issue.number }}
+  # THE EVENT NAME IS PART OF THE KEY. Without it a comment and a push share a group, so posting the
+  # comment the dev prompt REQUIRES cancelled that pull request's own in-flight `Build and tests` —
+  # a red caused by following the instructions, which no push clears. Recovery was `gh run rerun`,
+  # a command in no role's prompt.
+  group: gates-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number || github.sha }}
   cancel-in-progress: true
 
 permissions:

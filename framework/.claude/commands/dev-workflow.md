@@ -71,10 +71,23 @@ pretending it belongs to whichever Issue came first is not.
 - **Tick a task when it is done, never to clear a gate.** Work that did not happen gets the list
   trimmed and the remainder filed.
 
-**On an OpenSpec project** every Issue gets `openspec/changes/<slug>/` with a `proposal.md` and a
-`tasks.md`. `Tasks complete` fails on one unticked box. **You do not archive** — that is product's,
-after UAT. No `openspec/` directory means the gate says NOT APPLICABLE; do not create one to satisfy
-it.
+**On an OpenSpec project** every Issue gets a change directory. `Tasks complete` fails on one
+unticked box, and on a `spec-driven` project it also fails a change openspec could not archive:
+
+```
+openspec/changes/<slug>/
+  proposal.md          ## Why / ## What Changes
+  tasks.md             - [ ] one line per task
+  specs/<capability>/spec.md
+        ## ADDED Requirements
+        ### Requirement: <what the system shall do>
+        #### Scenario: <the case>
+        - **WHEN** … / - **THEN** …
+```
+
+That last file is the one nobody tells you about: without it the work merges and the specification
+does not, and product finds out at archive time. **You do not archive** — that is product's, after
+UAT. No `openspec/` directory means the gate says NOT APPLICABLE; do not create one to satisfy it.
 
 ## 4. Before you hand off
 
