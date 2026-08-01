@@ -46,6 +46,15 @@ run_gate() {
 
   while read -r sha; do
     [ -n "$sha" ] || continue
+    # A MERGE COMMIT IS GITHUB'S SENTENCE, NOT AN AUTHOR'S. `Merge pull request #4 from …` can never
+    # satisfy `<type>(<scope>):` and carries no `Agent:` trailer, so once this gate began running on
+    # pushes to the default branch, EVERY merge turned `main` red — a failure nobody caused and
+    # nobody can fix. A guaranteed red trains a reader to ignore a red gate.
+    #
+    # Recognised by having two parents, which is what a merge commit is, rather than by its wording.
+    if [ "$(git rev-list --parents -n1 "$sha" | wc -w)" -gt 2 ]; then
+      continue
+    fi
     subject=$(git log -1 --format=%s "$sha")
     if ! printf '%s' "$subject" | grep -qE "^($TYPES)(\([a-z0-9-]+\))?: .+"; then
       echo "::error::$(git rev-parse --short "$sha") subject is not '<type>(<scope>): <subject>': $subject" >&2
@@ -118,6 +127,21 @@ Agent: dev-a"
 Agent: dev-a"
   ( cd "$tmp/c" && bash "$me" dev/fix/1-ok "$c" ) >/dev/null 2>&1 \
     && { echo "SELF-TEST FAIL: a subject one character over the limit PASSED" >&2; rc=1; }
+
+  # 6a. A MERGE COMMIT MUST BE SKIPPED, not judged. Driven with a real two-parent commit whose
+  #     subject is GitHub's own, because that is the one this gate reddened `main` on.
+  mkdir -p "$tmp/m"; m=$(_repo "$tmp/m")
+  git -C "$tmp/m" checkout -q -b side
+  echo s > "$tmp/m/s"; git -C "$tmp/m" add -A; git -C "$tmp/m" commit -qm "feat(x): side work
+
+Agent: dev-a"
+  git -C "$tmp/m" checkout -q main
+  echo t > "$tmp/m/t"; git -C "$tmp/m" add -A; git -C "$tmp/m" commit -qm "feat(y): main work
+
+Agent: dev-a"
+  git -C "$tmp/m" merge -q --no-ff side -m "Merge pull request #4 from owner/dev/feat/2-slug-check"
+  ( cd "$tmp/m" && bash "$me" dev/fix/1-ok "$m" ) >/dev/null 2>&1 \
+    || { echo "SELF-TEST FAIL: a merge commit was judged by the work-branch rules — every merge would redden the default branch" >&2; rc=1; }
 
   # 6. A COMMIT WITH NO Agent: TRAILER MUST FAIL HERE, not three gates later as somebody else's
   #    independence problem.

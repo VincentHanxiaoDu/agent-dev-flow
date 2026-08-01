@@ -36,6 +36,10 @@ against the released commit all reported `skipped`.
 **If nothing ran on this sha, the release notes say that.** It is a fact about the release, not a
 reason not to cut it.
 
+**A red on the target sha is your call, and it is the common case.** A machinery failure — a gate
+about the process rather than the product — does not block a release; a failing product gate does.
+Say which it was, by name, in the notes.
+
 ## 3. Write the notes from evidence
 
 - **What a person can now do that they could not before.** In their words, not commit subjects.
@@ -43,7 +47,20 @@ reason not to cut it.
   open Issues and reviews — do not compose them from memory.
 - **What produced the greens.** If no CI ran, say that.
 
-## 4. Tag
+## 4. Choose the number, and say what it is
+
+**A release whose main path refuses is marked as one.** Set `prerelease=true` and open the notes
+with what it does *not* do. The risk is not that somebody is disappointed — it is that they read a
+version number and assume.
+
+```bash
+gh api ... -F prerelease=true
+```
+
+**The number is yours.** `v0.0.x` for something you would not tell a stranger to install; `v0.x.y`
+once its main path works.
+
+## 5. Tag
 
 ```bash
 # Notes go in a FILE. They contain newlines, backticks and `#`; inline, the shell mangles them.
@@ -51,7 +68,7 @@ gh api -X POST "repos/$REPO/releases" -f tag_name=$ARGUMENTS -f target_commitish
   -f name="..." -F body=@notes.md
 ```
 
-## 5. Verify, then report
+## 6. Verify, then report
 
 **Fetch the release back and confirm it exists.** A create call that exits 0 is not proof.
 
