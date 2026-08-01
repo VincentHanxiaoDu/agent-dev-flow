@@ -33,7 +33,11 @@ trap cleanup EXIT
 [ -d "$SRC" ] || { echo "error: no framework/ directory found at $SRC" >&2; exit 1; }
 [ "$target" != "$(dirname "$SRC")" ] || { echo "error: refusing to install the framework into itself" >&2; exit 1; }
 
-manifest() { ( cd "$SRC" && find .claude scripts -type f | sed 's#^\./##' ); }
+# .github IS IN THE MANIFEST, and it was not. The workflow that produces every required context
+# was therefore never installed: the gates existed as scripts nothing ran, and the install then
+# refused to print a context list because it could not find the file it had not copied. The refusal
+# was right and it is how this was found.
+manifest() { ( cd "$SRC" && find .claude .github scripts -type f | sed 's#^\./##' ); }
 
 # --- what would change -------------------------------------------------------
 declare -a overwrites=() news=()
@@ -126,6 +130,24 @@ echo
 ( cd "$target" && ./scripts/queue.sh --self-test >/dev/null ) || {
   echo "error: queue.sh's self-test fails here. Refusing to report a successful install." >&2; exit 1; }
 
+# THE REQUIRED CONTEXTS ARE READ FROM THE INSTALLED WORKFLOW, never restated here. They were
+# restated once, and the copy named a fifth context no job produced — anyone following those
+# instructions would have protected `main` on a check that never arrives, and every pull request
+# would have waited on it forever. A list that can drift from the thing it describes will.
+CONTEXTS=$(sed -n 's/^    name: /       /p' "$target/.github/workflows/gates.yml" 2>/dev/null || echo "")
+[ -n "$CONTEXTS" ] || {
+  echo "error: could not read the job names from the installed workflow, so the list of required" >&2
+  echo "       contexts cannot be printed. Refusing to guess: a wrong list protects main on a check" >&2
+  echo "       that never arrives, and every pull request then waits forever." >&2
+  exit 1; }
+
+cat <<EOF
+
+Required contexts, read from the workflow just installed:
+
+$CONTEXTS
+EOF
+
 cat <<'EOF'
 
 Installed and verified.
@@ -143,13 +165,8 @@ Still to do, and this script cannot do it for you:
 
   1. Labels the queue reads:  type:feature  type:bug  type:chore
                               area:product  area:machinery
-  2. Protect `main`, requiring these five contexts. Until then every gate is advisory:
-       Build and tests
-       Branch and commit convention
-       Tasks complete
-       Generated files not hand-authored
-       Reviewed by an agent that authored none of its commits
-     The set is frozen at five. A sixth is a decision for whoever owns the project.
+  2. Protect `main`, requiring the contexts listed above. Until then every gate is advisory
+     and the process enforces nothing. Adding a sixth is a decision for whoever owns the project.
   3. Put this project's own instructions in .workflow/<role>/AGENT.md — build commands,
      domain vocabulary, conventions. The framework half never touches those files.
 EOF

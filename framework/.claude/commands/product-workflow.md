@@ -28,6 +28,18 @@ It emits `NEW #<n> <title>` when work appears, and **`LOOKUP FAILED: <reason>` w
 answered** — because an expired token and a quiet queue look identical otherwise, and a role that
 cannot tell them apart sits idle believing it is finished.
 
+```
+Monitor(command: "./scripts/watch-prs.sh product 60", description: "product PRs going red or needing changes", persistent: true)
+```
+
+That second one is why a red gate reaches you. It emits **`FAILING`, `CHANGES`, `READY` and
+`MERGED`** — every terminal state, not only the good one, because a watch that announced success
+alone would be silent through the failure it exists to catch, and silence is indistinguishable from
+still-running.
+
+**A `FAILING` or `CHANGES` event is work.** Fix it on the branch it came from; do not wait for
+someone to tell you twice.
+
 **When an event lands, work it the same way — fan out, do not queue behind yourself.**
 
 ## 3. Work all of it in parallel

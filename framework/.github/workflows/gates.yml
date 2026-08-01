@@ -1,0 +1,180 @@
+name: gates
+
+# Everything mechanical runs on the pull request. The review gate additionally listens to comments,
+# because a review ARRIVES as a comment and a pull_request event has already fired by then.
+#
+# ONE GITHUB CONSTRAINT WORTH KNOWING BEFORE IT SURPRISES YOU: `issue_comment` is not a
+# pull-request event, so GitHub runs it from the workflow file on the DEFAULT branch. Until this
+# file has reached the default branch, posting a review will not re-evaluate the gate by itself;
+# re-run the pull request's own run instead.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created, edited]
+
+concurrency:
+  group: gates-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  statuses: write
+  pull-requests: read
+  issues: read
+
+jobs:
+  # ── everything mechanical, on the pull request only ──────────────────────────
+  mechanical:
+    name: Branch name and commit convention
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # THE GATES READ A COMMIT RANGE, so they need the history. Without this they cannot
+          # compute the range and refuse — correctly, but on every run, for the wrong reason.
+          fetch-depth: 0
+
+      # A GATE THAT CANNOT BE SHOWN TO FAIL IS NOT A GATE, so the self-tests run first and their
+      # failure is the job's failure. Everything after this point is judged by a checker that has
+      # just demonstrated it can go red.
+      - name: Self-test every gate
+        run: |
+          set -euo pipefail
+          for s in ./scripts/check-*.sh ./scripts/queue.sh ./scripts/watch-*.sh; do
+            [ -f "$s" ] || continue
+            bash "$s" --self-test >/dev/null || { echo "::error::$s cannot be shown to fail"; exit 1; }
+          done
+          echo "every gate's self-test passes"
+
+      - name: Branch name and commit convention
+        run: ./scripts/check-naming.sh "${{ github.head_ref }}" "${{ github.event.pull_request.base.sha }}"
+
+      - name: The process the prompts describe is the process they run
+        run: ./scripts/check-prompts.sh
+
+  tasks:
+    name: Tasks complete
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      # PASSES ON A PROJECT THAT DOES NOT USE OPENSPEC, and says so. A gate that blocks every pull
+      # request in a repository it does not apply to is worse than no gate: nothing merges, and the
+      # reason is invisible until someone reads a log.
+      - run: ./scripts/check-tasks-complete.sh "${{ github.event.pull_request.base.sha }}"
+
+  generated:
+    name: Generated files not hand-authored
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - run: ./scripts/check-generated.sh "${{ github.event.pull_request.base.sha }}"
+
+  build:
+    name: Build and tests
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      # THE PROJECT'S OWN BUILD, IF IT HAS ONE. An absent Makefile target is not a failure — this
+      # framework installs into projects that have not been built yet — but it is SAID, so a green
+      # here is never mistaken for "the tests passed".
+      - name: Build and tests
+        run: |
+          set -euo pipefail
+          if [ -f Makefile ] && grep -qE '^ci:' Makefile; then
+            make ci
+          else
+            echo "NOT APPLICABLE: no 'ci' target in a Makefile, so nothing was built or tested here."
+            echo "This green means the gate did not apply. It does NOT mean the tests passed."
+          fi
+
+  # ── the review gate: both event paths, one commit status ─────────────────────
+  review:
+    name: Reviewed by an agent that authored none of its commits
+    if: github.event_name == 'pull_request' || github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - id: pr
+        name: Resolve the pull request this event belongs to
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          # READ FROM THE API ON BOTH PATHS rather than trusting the pull_request payload: the
+          # payload is a snapshot from when the event fired, and a review posted against a sha that
+          # has since been pushed over must be seen as stale.
+          gh api "repos/$REPO/pulls/$NUMBER" > pr.json
+          {
+            echo "head_sha=$(jq -r .head.sha pr.json)"
+            echo "base_sha=$(jq -r .base.sha pr.json)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Self-test the checker
+        id: selftest
+        run: ./scripts/check-review.sh --self-test
+
+      - name: Require a review of this head sha
+        # `continue-on-error` KEEPS THE JOB GREEN WHILE THE STEP'S OUTCOME STAYS READABLE. Without
+        # it, a pull request awaiting review — the normal case — leaves a red check run on the head,
+        # and GitHub refuses to enable auto-merge on a pull request with any failing check run even
+        # when every required context is green. The verdict lives in the commit status below and
+        # nowhere else: one gate, one artefact.
+        continue-on-error: true
+        if: always()
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$REPO/issues/$NUMBER/comments" --jq '.[]|{body}' | jq -s '.' > comments.json
+          ./scripts/check-review.sh "${{ steps.pr.outputs.head_sha }}" comments.json "${{ steps.pr.outputs.base_sha }}"
+
+      - name: Publish the verdict as a commit status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # A BROKEN CHECKER MUST NOT PUBLISH A PASS. The self-test runs before the check and its
+          # outcome is read here, so an unverified checker returning 0 holds rather than approves.
+          if [ "${{ steps.selftest.outcome }}" != "success" ]; then
+            state=pending
+            desc="the review checker failed its own self-test — nothing here says whether a review exists"
+          elif [ "${{ steps.check.outcome }}" = "success" ]; then
+            state=success; desc="Reviewed by an agent that did not build it"
+          elif [ "${{ steps.check.outcome }}" = "failure" ]; then
+            state=failure; desc="No current review by an independent agent — see the log"
+          else
+            # ACCUSATION IS RESERVED FOR THE ONE OUTCOME THAT MEANS IT. `cancelled`, `skipped` and
+            # an empty string all land here and hold, rather than reporting that no review exists.
+            state=pending
+            desc="the review check did not complete (outcome: ${{ steps.check.outcome }})"
+          fi
+          gh api -X POST "repos/$REPO/statuses/${{ steps.pr.outputs.head_sha }}" \
+            -f state="$state" \
+            -f context="Reviewed by an agent that authored none of its commits" \
+            -f description="$desc" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
+          echo "published: $state — $desc"

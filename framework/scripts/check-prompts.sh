@@ -52,6 +52,10 @@ run_check() {
     # process exists to remove. The queue is a state the role watches.
     grep -q 'watch-queue\.sh' "$f" \
       || { echo "::error::$role.md starts no monitor, so the role works one round and waits to be told about the next" >&2; rc=1; }
+    # AND IT MUST WATCH ITS OWN PULL REQUESTS. Watching only the Issue queue leaves an agent
+    # waiting for new work with its own branch red and nothing saying so.
+    grep -q 'watch-prs\.sh' "$f" \
+      || { echo "::error::$role.md never watches its own PRs — a red gate or a requested change would never reach it" >&2; rc=1; }
   done
 
   # R4 — CLOSURE AUTHORITY LIVES IN THE PROMPT OF THE ROLE THAT CLOSES, and nowhere else.
@@ -86,7 +90,7 @@ run_check() {
       || { echo "::error::$role.md has no @.workflow/<role>/AGENT.md injection point — a project could only extend it by editing a file the installer overwrites" >&2; rc=1; }
   done
 
-  [ "$rc" -eq 0 ] && echo "prompts ok: every role pulls its own queue and fans out uncapped, closure authority is stated where it is exercised, criteria cannot be softened, every working role watches its queue, and every command has its project injection point"
+  [ "$rc" -eq 0 ] && echo "prompts ok: every role pulls its own queue and fans out uncapped, closure authority is stated where it is exercised, criteria cannot be softened, every working role watches its queue and its own PRs, and every command has its project injection point"
   return "$rc"
 }
 

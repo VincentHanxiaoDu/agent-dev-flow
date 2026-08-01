@@ -84,6 +84,9 @@ run "gate self-tests" bash -c "for s in $here/check-*.sh; do bash \"\$s\" --self
 run "prompts"         "$here/check-prompts.sh"
 run "queue"           "$here/queue.sh"        --self-test
 run "queue watch"     "$here/watch-queue.sh"  --self-test
+run "PR watch"        "$here/watch-prs.sh"    --self-test
+run "tasks complete"  "$here/check-tasks-complete.sh" "$base"
+run "generated files" "$here/check-generated.sh" "$base"
 run "branch and commits" "$here/check-naming.sh" "$branch" "$base"
 
 echo
