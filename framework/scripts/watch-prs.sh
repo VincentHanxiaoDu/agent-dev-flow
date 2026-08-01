@@ -117,7 +117,23 @@ while true; do
     pending=$(printf '%s' "$runs" | jq -r '[.check_runs[]? | select(.status!="completed")] | length' 2>/dev/null || echo 0)
 
     if [ -n "$failing" ]; then
-      emit FAILING "$num" "$title" "$failing"
+      # THE GATE'S OWN MESSAGE, NOT JUST ITS NAME. Measured by handing a dev agent nothing but the
+      # gate name: it recovered the diagnosis, but only by mapping the PR number to a branch over
+      # REST and then re-running the gate locally to reproduce the text. Its own conclusion — "the
+      # entire diagnosis was already printed by CI and then discarded before it reached me."
+      #
+      # A gate name is also ambiguous on purpose: `Branch name and commit convention` covers two
+      # rules, and half of it was a red herring for the failure that actually occurred.
+      why=$(gh api "repos/$REPO/commits/$sha/check-runs" \
+              --jq '[.check_runs[]? | select(.conclusion=="failure" or .conclusion=="timed_out" or .conclusion=="cancelled") | .id][]' 2>/dev/null \
+            | while read -r id; do
+                gh api "repos/$REPO/check-runs/$id/annotations" \
+                  --jq '.[]? | select(.message | test("exit code") | not) | .message' 2>/dev/null
+              done | head -3 | tr '\n' ' ' | cut -c1-300)
+      # AN ANNOTATION THAT COULD NOT BE READ IS NOT AN ABSENT ONE. Say which happened, or the reader
+      # takes a bare gate name as "there was nothing more to say".
+      [ -n "$why" ] || why="$failing (no annotation readable — fetch the run log)"
+      emit FAILING "$num" "$title" "[$branch] $why"
       continue
     fi
 

@@ -36,7 +36,18 @@ alone would be silent through the failure it exists to catch, and silence is ind
 still-running.
 
 **A `FAILING` or `CHANGES` event is work.** Fix it on the branch it came from; do not wait for
-someone to tell you twice.
+someone to tell you twice. The event carries the branch and the gate's own message, so it is the
+diagnosis — you should not have to go and find one.
+
+**Reproduce it locally before you change anything:** `./scripts/run-gates.sh` prints the same text
+CI did, and confirms the fix without a round trip.
+
+**A commit-shape failure is fixed by rewriting history, not by a new commit.** `git commit --amend`
+then `git push --force-with-lease` — never a bare `--force`, which discards work you cannot see.
+
+**A force-push invalidates the review.** The review gate re-runs on the new sha and can come back
+red for a reason unrelated to what you fixed, so **wait for every check to complete before calling
+it done.** Four checks returning fast is not the answer.
 
 **When an event lands, work it the same way — fan out, do not queue behind yourself.**
 
