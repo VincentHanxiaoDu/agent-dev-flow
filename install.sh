@@ -98,7 +98,13 @@ EOF
   echo "  + .workflow/$role/AGENT.md"
 done
 
-printf 'ref=%s\n' "$REF" > "$target/.agent-dev-flow"
+# THE SHA IS RECORDED, NOT JUST THE BRANCH. I fixed the same defect in the framework three times
+# and each time the repository under test still carried the old copy, because a manual refresh is a
+# step that gets skipped and nothing said so. `ref=main` is true forever and answers nothing.
+FW_SHA=$( { [ -n "$SELF_DIR" ] && git -C "$SELF_DIR" rev-parse HEAD 2>/dev/null; } \
+          || gh api "repos/${REPO_URL#https://github.com/}/commits/$REF" --jq .sha 2>/dev/null \
+          || echo unknown )
+printf 'ref=%s\nsha=%s\n' "$REF" "$FW_SHA" > "$target/.agent-dev-flow"
 
 # --- the bootstrap command, installed once at the USER level ------------------
 # CHICKEN AND EGG: `/init-workflow` lives in `.claude/commands/`, which does not exist until this

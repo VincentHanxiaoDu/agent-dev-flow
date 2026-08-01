@@ -97,6 +97,26 @@ fi
 base=$(git merge-base "$base_ref" HEAD) || {
   echo "::error::could not resolve a merge base against $base_ref. Fetch it first — this is a lookup failure and not a verdict about anything." >&2; exit 1; }
 
+# IS THE INSTALLED FRAMEWORK THE CURRENT ONE? Asked here because this is the command every role
+# runs before handing off, and because the alternative is remembering — which failed three times in
+# one day, each time leaving a fixed defect live in the repository under test.
+#
+# Never fatal, and never silent about being unable to tell: an offline run says so rather than
+# implying the answer is yes.
+if [ -f .agent-dev-flow ]; then
+  _have=$(sed -n 's/^sha=//p' .agent-dev-flow)
+  _url=$(sed -n 's/^url=//p' .agent-dev-flow); _url=${_url:-VincentHanxiaoDu/agent-dev-flow}
+  if [ -n "$_have" ] && [ "$_have" != unknown ]; then
+    _latest=$(gh api "repos/$_url/commits/main" --jq .sha 2>/dev/null || echo "")
+    if [ -z "$_latest" ]; then
+      echo "note: could not reach the framework, so whether this install is current is UNKNOWN."
+    elif [ "$_have" != "$_latest" ]; then
+      echo "NOTE: this project has agent-dev-flow ${_have:0:8}; the framework is at ${_latest:0:8}."
+      echo "      Re-run the installer — a fix that is upstream and not here is a fix nobody has."
+    fi
+  fi
+fi
+
 echo "gates for $branch against $base_ref ($(git rev-parse --short "$base"))"
 echo
 
