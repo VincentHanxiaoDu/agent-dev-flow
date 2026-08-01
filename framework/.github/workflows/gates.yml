@@ -198,9 +198,14 @@ jobs:
         run: |
           set -euo pipefail
           gh api --paginate "repos/$REPO/issues/$NUMBER/comments" --jq '.[]|{body}' | jq -s '.' > comments.json
-          # Tee'd so the publishing step can tell a refusal from an absence without re-deriving it.
-          ./scripts/check-review.sh "${{ steps.pr.outputs.head_sha }}" comments.json "${{ steps.pr.outputs.base_sha }}" 2>&1 | tee check.log
-          exit "${PIPESTATUS[0]}"
+          # The exit code is RECORDED, because the publishing step needs to tell a refusal (2) from
+          # an absence (1) and a step's outcome carries neither.
+          set +e
+          ./scripts/check-review.sh "${{ steps.pr.outputs.head_sha }}" comments.json "${{ steps.pr.outputs.base_sha }}"
+          rc=$?
+          set -e
+          echo "$rc" > review.rc
+          exit "$rc"
 
       - name: Publish the verdict as a commit status
         if: always()
@@ -218,10 +223,12 @@ jobs:
             state=success; desc="Reviewed by an agent that did not build it"
           elif [ "${{ steps.check.outcome }}" = "failure" ]; then
             state=failure
-            # A REFUSED REVIEW AND AN ABSENT ONE ARE DIFFERENT FACTS. They shared this string, so a
-            # reviewer that had just posted `changes-requested` could not tell its verdict had
-            # landed from its comment never being parsed at all — it had to open the run log.
-            if grep -q 'the current review requests changes' check.log 2>/dev/null; then
+            # A REFUSED REVIEW AND AN ABSENT ONE ARE DIFFERENT FACTS, and they shared this string —
+            # so a reviewer that had just posted `changes-requested` could not tell its verdict had
+            # landed from its comment never being parsed. check-review.sh exits 2 for a parsed
+            # refusal and 1 for everything else, which is a fact the step recorded rather than a log
+            # line grepped for. The grep version did not work and shipped anyway.
+            if [ "$(cat review.rc 2>/dev/null || echo 1)" = "2" ]; then
               desc="Changes requested by a reviewer — the review landed and refused this head"
             else
               desc="No current review by an independent agent — see the log"

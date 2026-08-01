@@ -67,7 +67,12 @@ run_gate() {
   [ -n "$reviewer" ] || { echo "::error::the review names no reviewer" >&2; rc=1; }
   case "$verdict" in
     approve) : ;;
-    changes-requested) echo "::error::the current review requests changes" >&2; rc=1 ;;
+    # EXIT 2, NOT 1. A refused review and an absent one are different facts, and they shared an
+    # exit code — so the workflow could only publish one description for both, and a reviewer that
+    # had just refused a pull request read "No current review by an independent agent" and could not
+    # tell its verdict had landed from its comment never being parsed. Caught by a reviewer that
+    # checked the fix rather than the claim; the previous attempt grepped a log file and did not work.
+    changes-requested) echo "::error::the current review requests changes" >&2; rc=2 ;;
     "") echo "::error::the review carries no Verdict:" >&2; rc=1 ;;
     *) echo "::error::unknown verdict '$verdict' — expected approve or changes-requested" >&2; rc=1 ;;
   esac
@@ -121,9 +126,15 @@ Agent: dev-a"
   _c "Reviewed-by: reviewer-a\\nReviewed-sha: 0000000000000000000000000000000000000000\\nVerdict: approve"
   _run >/dev/null 2>&1 && { echo "SELF-TEST FAIL: a review of another sha certified this head" >&2; rc=1; }
 
-  # 5. changes-requested must FAIL.
+  # 5. changes-requested must FAIL, AND WITH ITS OWN EXIT CODE. Sharing one with "no review at all"
+  #    is why a reviewer could not tell a landed refusal from an unparsed comment.
   _c "Reviewed-by: reviewer-a\\nReviewed-sha: $head\\nVerdict: changes-requested"
-  _run >/dev/null 2>&1 && { echo "SELF-TEST FAIL: changes-requested PASSED" >&2; rc=1; }
+  local crc=0; _run >/dev/null 2>&1 || crc=$?
+  [ "$crc" -eq 2 ] || { echo "SELF-TEST FAIL: changes-requested exited $crc, not 2 — it shares a code with an absent review" >&2; rc=1; }
+  # And an ABSENT review must NOT use that code.
+  _c "Reviewed-by: reviewer-a\\nReviewed-sha: 0000000000000000000000000000000000000000\\nVerdict: approve"
+  local arc=0; _run >/dev/null 2>&1 || arc=$?
+  [ "$arc" -eq 1 ] || { echo "SELF-TEST FAIL: an absent review exited $arc, not 1" >&2; rc=1; }
 
   # 6. AN ACCURATE SHORT REVIEW MUST PASS. The previous build's character floor rejected a
   #    38-character scope statement and accepted 45 characters of "looks fine to me".

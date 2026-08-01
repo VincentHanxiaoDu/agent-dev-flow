@@ -49,7 +49,10 @@ the criteria actually settle, make the undecided path refuse loudly rather than 
 say on the pull request what is not done and why. **Leave the Issue open.**
 
 **Two Issues sharing plumbing that belongs to neither:** write it once, commit it, cut the second
-branch from that commit and say in its body that it is stacked. That is honest; duplicating it or
+branch from that commit and say in its body that it is stacked. **Extending that plumbing later,
+once both branches are under review, has no clean move** — the same helper added to both is a
+conflict for whichever lands second, and a rebase invalidates the reviews. Put it on `main` in its
+own pull request, or work around it on the branch and say you did. That is honest; duplicating it or
 pretending it belongs to whichever Issue came first is not.
 
 ## 3. Principles
@@ -87,7 +90,7 @@ asks somebody else to verify something you have said is not done.
 ```
 
 **A commit-shape failure is an amend and a `--force-with-lease`, not a new commit — and a
-force-push invalidates the review.** You cannot fix that yourself. Ask for a re-review.
+force-push invalidates the review.** You cannot fix that yourself: `./scripts/pr.sh rereview <n>`.
 
 ## 5. Not yours
 

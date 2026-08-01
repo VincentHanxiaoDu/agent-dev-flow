@@ -17,6 +17,7 @@
 #        pr.sh state <number> [--brief]     exits 1 on red, 2 on no answer yet — so it kills an
 #                                            `&&` chain by design; use `;` or check $? .
 #        pr.sh arm <number>
+#        pr.sh rereview <number>
 #        pr.sh --self-test
 set -euo pipefail
 
@@ -135,6 +136,33 @@ do_state() {
   return $rc
 }
 
+# --- rereview ----------------------------------------------------------------
+# ASKING FOR A RE-REVIEW HAD NO VERB. The dev manual says "ask for a re-review" and named nothing to
+# ask with, so an agent fell back to a bare comment and hoped a reviewer would notice the head sha
+# had moved. A re-review request is a state change on the pull request, not a note.
+do_rereview() {
+  local num=$1 sha
+  resolve_repo
+  sha=$(gh api "repos/$REPO/pulls/$num" --jq .head.sha 2>/dev/null) || {
+    echo "::error::could not read pull request #$num — this is a LOOKUP FAILURE, not a request sent." >&2; exit 1; }
+  local body="/tmp/.rereview-$num.md"
+  {
+    printf '**Re-review requested — the head has moved to `%s`.**\n\n' "$(printf '%s' "$sha" | cut -c1-8)"
+    printf 'Any earlier verdict was posted against a different commit and no longer applies. The gate
+'
+    printf 'reads the sha, so it is already red until an independent agent posts a verdict for this one.
+
+'
+    printf 'What changed since the last review is in the comments above.
+'
+  } > "$body"
+  gh api -X POST "repos/$REPO/issues/$num/comments" -F body=@"$body" >/dev/null || {
+    echo "::error::the request was NOT posted. Do not report that a re-review was asked for." >&2; exit 1; }
+  rm -f "$body"
+  echo "re-review requested on #$num for $(printf '%s' "$sha" | cut -c1-8)"
+  echo "  the status stays red until somebody who authored none of these commits posts a verdict."
+}
+
 # --- arm ---------------------------------------------------------------------
 do_arm() {
   local num=$1 out armed
@@ -206,6 +234,7 @@ case "${1:-}" in
   open)  [ $# -eq 4 ] || { echo "usage: pr.sh open <branch> <title> <body-file>" >&2; exit 2; }; do_open "$2" "$3" "$4" ;;
   state) [ $# -ge 2 ] || { echo "usage: pr.sh state <number> [--brief]" >&2; exit 2; }; do_state "$2" "${3:-}" ;;
   arm)   [ $# -eq 2 ] || { echo "usage: pr.sh arm <number>" >&2; exit 2; };   do_arm "$2" ;;
+  rereview) [ $# -eq 2 ] || { echo "usage: pr.sh rereview <number>" >&2; exit 2; }; do_rereview "$2" ;;
   "")    echo "usage: pr.sh open|state|arm ... | --self-test" >&2; exit 2 ;;
-  *)     echo "::error::'$1' is not a subcommand. One of: open state arm" >&2; exit 2 ;;
+  *)     echo "::error::'$1' is not a subcommand. One of: open state arm rereview" >&2; exit 2 ;;
 esac
