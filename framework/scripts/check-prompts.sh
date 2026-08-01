@@ -9,7 +9,7 @@
 #
 # So the properties the PRD names are asserted against the prompt files themselves, mechanically.
 #
-# Usage: check-prompts.sh [agents-dir]      default: .claude/agents
+# Usage: check-prompts.sh [agents-dir]      default: .claude/commands
 #        check-prompts.sh --self-test
 set -euo pipefail
 
@@ -19,7 +19,7 @@ case "${1:-}" in
 esac
 
 run_check() {
-  local dir=${1:-.claude/agents} rc=0 f role
+  local dir=${1:-.claude/commands} rc=0 f role
 
   # A MISSING DIRECTORY MUST NOT READ AS "EVERY PROMPT IS FINE". This is the defect this whole
   # project is about, and the check that reports on it is the last place it should appear.
@@ -30,13 +30,13 @@ run_check() {
 
   # Every role the queue can dispatch must have a prompt. A role with a queue arm and no prompt is
   # a role that receives work and does not know what to do with it.
-  for role in dev qa product ops pm; do
+  for role in dev-workflow qa-workflow product-workflow create-feature release-version; do
     [ -f "$dir/$role.md" ] || { echo "::error::no prompt for role '$role'" >&2; rc=1; }
   done
 
   # R1 — EVERY WORKING ROLE PULLS ITS WHOLE QUEUE AND FANS OUT. pm is excluded deliberately: it
   # dispatches one message per role and must NOT fan out over Issues itself.
-  for role in dev qa product ops; do
+  for role in dev-workflow qa-workflow product-workflow; do
     f="$dir/$role.md"; [ -f "$f" ] || continue
     grep -q 'queue\.sh' "$f" \
       || { echo "::error::$role.md never tells the role to pull its queue — it can only ever work what it is handed" >&2; rc=1; }
@@ -50,27 +50,38 @@ run_check() {
   done
 
   # R4 — CLOSURE AUTHORITY LIVES IN THE PROMPT OF THE ROLE THAT CLOSES, and nowhere else.
-  grep -qi 'you close bugs and chores' "$dir/qa.md" 2>/dev/null \
+  grep -qi 'you close bugs and chores' "$dir/qa-workflow.md" 2>/dev/null \
     || { echo "::error::qa.md does not state that qa closes bugs and chores" >&2; rc=1; }
-  grep -qi 'you close features' "$dir/product.md" 2>/dev/null \
+  grep -qi 'you close features' "$dir/product-workflow.md" 2>/dev/null \
     || { echo "::error::product.md does not state that product closes features" >&2; rc=1; }
-  for role in dev ops pm; do
-    grep -qi 'close nothing\|You do not close' "$dir/$role.md" 2>/dev/null \
+  for role in dev-workflow; do
+    grep -qi 'close nothing\|You close nothing' "$dir/$role.md" 2>/dev/null \
       || { echo "::error::$role.md does not state that $role closes nothing" >&2; rc=1; }
   done
 
-  # R2 — THE COORDINATOR MUST NOT COMPOSE METHOD. The pm prompt has to say so, because the pm is
-  # the one agent whose failure mode is writing the other agents' instructions for them.
-  grep -qi 'belongs in the role' "$dir/pm.md" 2>/dev/null \
-    || { echo "::error::pm.md does not forbid explaining method in a dispatch" >&2; rc=1; }
+  # WRITING REQUIREMENTS: a criterion that can be softened to make it reachable is not a criterion,
+  # and the previous build produced one Issue carrying 247 of them in a single milestone.
+  grep -qi 'testable or it is not a criterion' "$dir/create-feature.md" 2>/dev/null \
+    || { echo "::error::create-feature.md does not require criteria to be testable" >&2; rc=1; }
+  grep -qi 'never soften' "$dir/create-feature.md" 2>/dev/null \
+    || { echo "::error::create-feature.md does not forbid softening a criterion to make it reachable" >&2; rc=1; }
 
-  # R7 — the ratio, and R8 — net reporting. Both are pm's and both were failed by the last build.
-  grep -qi 'machinery' "$dir/pm.md" 2>/dev/null \
-    || { echo "::error::pm.md does not carry the product:machinery ratio" >&2; rc=1; }
-  grep -qi 'opened vs closed\|net, never gross' "$dir/pm.md" 2>/dev/null \
-    || { echo "::error::pm.md does not require net reporting" >&2; rc=1; }
+  # RELEASING: product decides, ops executes; and an unnamed defect is not shippable.
+  grep -qi 'product decides' "$dir/release-version.md" 2>/dev/null \
+    || { echo "::error::release-version.md does not state that product decides and ops only executes" >&2; rc=1; }
+  grep -qi 'named defect is shippable' "$dir/release-version.md" 2>/dev/null \
+    || { echo "::error::release-version.md does not require known limitations to be named" >&2; rc=1; }
 
-  [ "$rc" -eq 0 ] && echo "prompts ok: every role pulls its own queue and fans out uncapped, closure authority is stated where it is exercised, and the coordinator neither schedules nor composes method"
+  # EVERY COMMAND CARRIES ITS PROJECT INJECTION POINT. Without it a project cannot add its own
+  # process or knowledge without editing a framework file, and an edit to a framework file is
+  # reverted by the next install — silently, which is how a team learns to stop upgrading.
+  for role in dev-workflow qa-workflow product-workflow create-feature release-version; do
+    f="$dir/$role.md"; [ -f "$f" ] || continue
+    grep -q '@\.workflow/' "$f" \
+      || { echo "::error::$role.md has no @.workflow/<role>/AGENT.md injection point — a project could only extend it by editing a file the installer overwrites" >&2; rc=1; }
+  done
+
+  [ "$rc" -eq 0 ] && echo "prompts ok: every role pulls its own queue and fans out uncapped, closure authority is stated where it is exercised, criteria cannot be softened, and every command has its project injection point"
   return "$rc"
 }
 
@@ -83,21 +94,21 @@ self_test() {
   case "$out" in *"LOOKUP FAILURE"*) : ;; *) echo "SELF-TEST FAIL: a missing directory gave no explanation" >&2; rc=1 ;; esac
 
   # 2. A directory of EMPTY prompts must fail — files existing is not the property being checked.
-  mkdir -p "$tmp/empty"; for r in dev qa product ops pm; do : > "$tmp/empty/$r.md"; done
+  mkdir -p "$tmp/empty"; for r in dev-workflow qa-workflow product-workflow create-feature release-version; do : > "$tmp/empty/$r.md"; done
   run_check "$tmp/empty" >/dev/null 2>&1 && { echo "SELF-TEST FAIL: empty prompts PASSED" >&2; rc=1; }
 
   # 3. THE REAL PROMPTS MUST PASS. If they do not, this check is wrong or the prompts regressed,
   #    and either way it must be visible here rather than discovered in a dispatch.
   local here; here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-  if [ -d "$here/.claude/agents" ]; then
-    run_check "$here/.claude/agents" >/dev/null 2>&1 \
+  if [ -d "$here/.claude/commands" ]; then
+    run_check "$here/.claude/commands" >/dev/null 2>&1 \
       || { echo "SELF-TEST FAIL: the shipped prompts do not satisfy the check" >&2; rc=1; }
 
     # 4. AND THE CHECK MUST BE ABLE TO CATCH THE REGRESSION IT EXISTS FOR — the one that made three
     #    of four roles serial. Strip the parallelism line from a real prompt and require a red.
-    cp -R "$here/.claude/agents" "$tmp/mutant"
-    grep -qi 'in parallel' "$tmp/mutant/qa.md" || { echo "SELF-TEST FAIL: mutation target absent — refusing to report a mutation that did not happen" >&2; rc=1; }
-    grep -vi 'in parallel\|all at once' "$tmp/mutant/qa.md" > "$tmp/m" && mv "$tmp/m" "$tmp/mutant/qa.md"
+    cp -R "$here/.claude/commands" "$tmp/mutant"
+    grep -qi 'in parallel' "$tmp/mutant/qa-workflow.md" || { echo "SELF-TEST FAIL: mutation target absent — refusing to report a mutation that did not happen" >&2; rc=1; }
+    grep -vi 'in parallel\|all at once' "$tmp/mutant/qa-workflow.md" > "$tmp/m" && mv "$tmp/m" "$tmp/mutant/qa-workflow.md"
     run_check "$tmp/mutant" >/dev/null 2>&1 \
       && { echo "SELF-TEST FAIL: a prompt with its parallelism removed PASSED — this check would not have caught the defect it was written for" >&2; rc=1; }
   fi
@@ -108,5 +119,5 @@ self_test() {
 
 case "${1:-}" in
   --self-test) self_test ;;
-  *) run_check "${1:-.claude/agents}" ;;
+  *) run_check "${1:-.claude/commands}" ;;
 esac
