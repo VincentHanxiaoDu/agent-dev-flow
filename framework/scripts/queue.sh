@@ -64,12 +64,48 @@ emit() { # emit <heading> <jq-filter> [--unclaimed]
   out=$(printf '%s' "$ALL" | jq -r "$filter" 2>/dev/null || true)
   # AN ISSUE SOMEBODY IS ALREADY ON IS NOT WORK TO START. Dropped rather than hidden: the count is
   # printed, because "nothing here" and "three of these are in flight" are different answers.
+  # --landed: only Issues whose branch is GONE from the remote, i.e. the work merged and the branch
+  # was deleted, or there never was one. An Issue still holding an open branch is somebody else's
+  # turn, and showing it here is how a role goes looking for work that does not exist yet.
+  if [ "$skip" = "--landed" ]; then
+    if [ -n "${OPEN_BRANCH_ISSUES:-}" ]; then
+      out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$OPEN_BRANCH_ISSUES" | tr '\n' '|' | sed 's/|$//'))  " || true)
+    fi
+    # And an Issue nobody has ever built is not landed either.
+    if [ -n "${EVER_BUILT:-}" ]; then
+      out=$(printf '%s\n' "$out" | grep -E "^  #($(printf '%s' "$EVER_BUILT" | tr '\n' '|' | sed 's/|$//'))  " || true)
+    else
+      out=""
+    fi
+  fi
+  # --unbuilt: unclaimed AND never built. An Issue whose work already merged is not dev's to
+  # resolve — a dev agent spent a whole round discovering that by hand, which is a round the queue
+  # could have saved it.
+  if [ "$skip" = "--unbuilt" ] && [ -n "${EVER_BUILT:-}" ]; then
+    out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$EVER_BUILT" | tr '\n' '|' | sed 's/|$//'))  " || true)
+  fi
+  [ "$skip" = "--unbuilt" ] && skip=--unclaimed
   if [ "$skip" = "--unclaimed" ] && [ -n "${CLAIMED:-}" ]; then
     local before after
+    local out_before=$out
     before=$(printf '%s\n' "$out" | grep -c . || true)
     out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$CLAIMED" | tr '\n' '|' | sed 's/|$//'))  " || true)
     after=$(printf '%s\n' "$out" | grep -c . || true)
-    [ "$before" -eq "$after" ] || head="$head  ($((before - after)) already have a branch — not shown)"
+    # NAMED, NOT COUNTED. `(1 already have a branch — not shown)` is unfalsifiable from the output,
+    # and it hid a real unclaimed Issue: another agent's branch happened to carry the number 4 in
+    # its slug — `product/chore/4-archive-...`, about a pull request, nothing to do with Issue #4 —
+    # so the claim set swallowed it. A dev agent found it only by listing Issues by hand, and
+    # called it what it is: a second agent silently deleting an item from its queue while the
+    # tooling returned rc=0 and a reassuring parenthesis.
+    #
+    # Naming them costs nothing and makes a wrong claim visible the moment it happens.
+    if [ "$before" -ne "$after" ]; then
+      local hidden
+      hidden=$(printf '%s\n' "$out_before" | grep -E "^  #($(printf '%s' "$CLAIMED" | tr '\n' '|' | sed 's/|$//'))  " | sed 's/^  /      /' || true)
+      head="$head
+  (already has a branch — somebody is on it. If that is wrong, the branch's number is wrong:)
+$hidden"
+    fi
   fi
   printf '\n%s\n' "$head"
   if [ -n "$out" ]; then printf '%s\n' "$out"; else printf '  (none)\n'; fi
@@ -121,8 +157,12 @@ my_prs() {
 # its own pull request was open two lines below, which is what running it showed.
 claimed_issues() {
   resolve_repo
-  api --paginate "repos/$REPO/branches?per_page=100" \
-    | jq -r '.[].name' 2>/dev/null \
+  # AN OPEN PULL REQUEST IS THE CLAIM, NOT A BRANCH THAT EXISTS. Branches outlive their merges —
+  # GitHub keeps them unless somebody deletes them — so a branch-based claim never expires, and an
+  # Issue whose work had shipped stayed marked as "somebody is on it" forever. An open pull request
+  # ends exactly when the work does, which is the property a claim needs.
+  api --paginate "repos/$REPO/pulls?state=open&per_page=100" \
+    | jq -r '.[].head.ref' 2>/dev/null \
     | sed -n 's#^[a-z]*/[a-z]*/\([0-9][0-9]*\)-.*#\1#p' | sort -u
 }
 
@@ -130,6 +170,13 @@ role_queue() {
   local role=$1
   ALL=$(issues | jq -s 'add // []')
   CLAIMED=$(claimed_issues)
+  resolve_repo
+  # Issues that still have an open branch: not landed. And issues that have EVER had a pull request,
+  # open or merged: the ones whose work exists at all.
+  OPEN_BRANCH_ISSUES=$CLAIMED
+  EVER_BUILT=$(api --paginate "repos/$REPO/pulls?state=all&per_page=100" \
+    | jq -r '.[].head.ref' 2>/dev/null \
+    | sed -n 's#^[a-z]*/[a-z]*/\([0-9][0-9]*\)-.*#\1#p' | sort -u)
 
   case "$role" in
     dev)
@@ -137,19 +184,23 @@ role_queue() {
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | any(startswith("type:")))
              | select([.labels[].name] | index("blocked") | not)
-             | "  #\(.number)  \(.title)"' --unclaimed
+             | "  #\(.number)  \(.title)"' --unbuilt
       my_prs "dev/*" ;;
     qa)
-      emit "BUGS AND CHORES TO VERIFY, MERGE AND CLOSE:" \
+      # NOT EVERY BUG IS YOURS YET. An Issue with no branch has nothing to verify — it is dev's to
+      # build first. Listing it under "to verify" is the same defect as the product arm one layer
+      # down: a queue that cannot tell "yours to act on now" from "yours eventually" sends a role
+      # looking for work that does not exist.
+      emit "ISSUES WHOSE WORK HAS LANDED — verify on main and CLOSE:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | index("type:bug") or index("type:chore"))
-             | "  #\(.number)  \(.title)"' 
+             | "  #\(.number)  \(.title)"' --landed 
       my_prs "*/fix/*|*/bug/*|*/chore/*|*/docs/*|*/test/*|*/ci/*|*/build/*|*/refactor/*|*/perf/*" "PULL REQUESTS TO VERIFY, MERGE AND CLOSE — whoever wrote them" ;;
     product)
-      emit "FEATURES TO UAT, ARCHIVE, MERGE AND CLOSE:" \
+      emit "FEATURES WHOSE WORK HAS LANDED — UAT on main and CLOSE:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | index("type:feature"))
-             | "  #\(.number)  \(.title)"' 
+             | "  #\(.number)  \(.title)"' --landed 
       my_prs "*/feat/*|*/spec/*" "PULL REQUESTS TO UAT, MERGE AND CLOSE — whoever wrote them" ;;
     ops)
       emit "OPEN PULL REQUESTS — CI and gate health:" \

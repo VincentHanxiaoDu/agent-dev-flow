@@ -49,6 +49,10 @@ construction — there is rarely anything to serialise.
 
 ## 4. Verifying
 
+**Work in your own `git worktree` or a fresh clone.** Other roles are in this repository at the same
+time, and the main working tree is nobody's in particular — one was found carrying an uncommitted
+edit that a verifier had to notice and exclude by hand.
+
 - **Drive the behaviour the Issue describes.** Not the diff, not the author's claim.
 - **Check the code, not the status.** A `Refs` trailer says *touches*, not *fixes*.
 - **A green check is not evidence unless you know what it examined.**
