@@ -73,9 +73,16 @@ Do not create one to satisfy it.
 
 **One sub-agent per Issue, started together.** Not the first, not the most important — every Issue that does not contend with another. **Two Issues serialise only if they edit the same file. No cap on width.**
 
+**You create every worktree yourself, before fanning out.** Sub-agents running `git worktree add`
+concurrently race on the same index lock.
+
 ```bash
 git worktree add ../wt-<issue> -b dev/<type>/<issue>-<slug> origin/main
 ```
+
+**An Issue whose criteria already pass on `main` gets no branch.** Drive them to be sure, then
+comment on the Issue with what you drove and route it onward — you cannot open an empty pull
+request and you do not close Issues.
 
 Each sub-agent gets its Issue number, worktree, scope and acceptance criteria. **It cannot ask you
 questions**, so everything it needs goes in what you hand it.
@@ -106,7 +113,18 @@ unfinished, and handing it on asks somebody else to verify something you have sa
 ./scripts/run-gates.sh          # do not assemble the invocation from memory
 ```
 
-Open the PR, arm auto-merge, **read back that it armed** — the CLI exits 0 while refusing.
+Open the pull request with **REST, not `gh pr create`** — that is a GraphQL call, and the GraphQL
+quota runs out separately from REST. This is the same failure `queue.sh` was rewritten to survive.
+
+```bash
+gh api -X POST "repos/$REPO/pulls" -f title=... -f head=<branch> -f base=main -f body=...
+```
+
+Then arm auto-merge and **read back that it armed** — the CLI exits 0 while refusing.
+
+**A green `Review gate ran` check is not a review.** That check says the evaluation happened. The
+verdict is the *commit status* of the same name as the required context, and it is `failure` until
+an independent agent posts one.
 
 ## 7. Not yours
 

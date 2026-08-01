@@ -81,7 +81,22 @@ run() { local label=$1; shift; local out status=0
 
 # The self-tests first: a gate that cannot be shown to fail is not a gate.
 run "gate self-tests" bash -c "for s in $here/check-*.sh; do bash \"\$s\" --self-test >/dev/null || exit 1; done"
-run "prompts"         "$here/check-prompts.sh"
+# NOT APPLICABLE INSIDE A WORKTREE, and this is not a nicety. `.claude/commands/` is gitignored —
+# local to a checkout, absent from every `git worktree add`. The dev prompt tells an agent to work
+# in a worktree AND to run this runner, so both sub-agents on the first real fan-out hit a red
+# `prompts` gate caused by nothing in their diff, and one tried copying the directory in and
+# produced thirty false assertion failures. CI deliberately excludes this check for the same
+# reason. A runner that is a strict superset of CI is wrong in the direction its own header
+# forbids: it reports a red that CI will not.
+# TESTED WHERE check-prompts.sh WILL LOOK — the CURRENT DIRECTORY, not next to this script. The
+# first version asked `$here/../.claude/commands`, which resolves to the main checkout even when the
+# runner is invoked from a worktree, so the condition was true and the gate still failed. Found by
+# running it in a worktree rather than by reading it.
+if [ -d ".claude/commands" ]; then
+  run "prompts"         "$here/check-prompts.sh"
+else
+  printf '  --    prompts (no .claude/commands here — local-only and gitignored, so not checked)\n'
+fi
 run "queue"           "$here/queue.sh"        --self-test
 run "queue watch"     "$here/watch-queue.sh"  --self-test
 run "PR watch"        "$here/watch-prs.sh"    --self-test

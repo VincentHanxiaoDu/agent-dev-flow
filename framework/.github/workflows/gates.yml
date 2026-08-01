@@ -110,7 +110,12 @@ jobs:
 
   # ── the review gate: both event paths, one commit status ─────────────────────
   review:
-    name: Reviewed by an agent that authored none of its commits
+    # THE JOB NAME IS NOT THE VERDICT. A check run called "Reviewed by an agent that authored none
+    # of its commits" showing SUCCESS reads as an assertion that a review happened; it means only
+    # that the evaluation ran. A dev agent read exactly that and took two unreviewed pull requests
+    # as reviewed. The verdict lives in the commit status this job publishes, which carries the
+    # required-context name and is the thing branch protection reads.
+    name: Review gate ran (the verdict is a commit status)
     if: github.event_name == 'pull_request' || github.event.issue.pull_request != null
     runs-on: ubuntu-latest
     timeout-minutes: 10
