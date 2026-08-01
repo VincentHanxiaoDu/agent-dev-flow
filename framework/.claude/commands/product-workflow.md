@@ -48,6 +48,11 @@ someone to tell you twice.
 
 ## 4. UAT
 
+**YOU ARE THE ONLY ROLE THAT SEES THE COMBINATION.** Every gate certifies one head against `main`,
+and every reviewer reads one branch — so if two pull requests interact, nobody has driven it. **UAT
+the merged tree**, and when a criterion cannot be met on one branch alone, say which build you drove
+it on rather than marking it unmet.
+
 **Drive the acceptance criteria against a build from the branch, in a clean checkout.** A working
 clone can carry uncommitted edits that are nobody's intent — `git worktree add` gives you a tree
 that is only what the branch says. Not the diff, not the author's

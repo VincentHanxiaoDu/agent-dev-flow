@@ -105,6 +105,12 @@ run_check() {
   grep -qi 'named defect is shippable' "$dir/release-version.md" 2>/dev/null \
     || { echo "::error::release-version.md does not require known limitations to be named" >&2; rc=1; }
 
+  # SOMEBODY MUST DRIVE THE COMBINATION. Every gate certifies one head against main and every
+  # reviewer reads one branch, so two pull requests that interact are verified by nobody. Product is
+  # the only role that sees the merged tree, and three reviewers in a row reported the gap unprompted.
+  grep -qi 'only role that sees the combination\|UAT the merged tree' "$dir/product-workflow.md" 2>/dev/null \
+    || { echo "::error::product-workflow.md does not say to drive the merged tree — no role verifies two PRs that interact" >&2; rc=1; }
+
   # A REVIEW MUST START FROM THE MERGE BASE. A branch cut before something else landed shows that
   # thing as deleted, and a reviewer who diffs against the tip files a false finding about work
   # nobody did — reported after it nearly happened.
