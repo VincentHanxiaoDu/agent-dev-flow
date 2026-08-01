@@ -39,8 +39,20 @@ api() {
 # and reported `no repository`. A self-test that cannot run is not a failing self-test, and the two
 # must never share an exit path. Caught by running it.
 resolve_repo() {
-  REPO=${REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || echo "")}
-  [ -n "$REPO" ] || { echo "::error::no repository. Run inside a checkout or set REPO." >&2; exit 2; }
+  [ -n "${REPO:-}" ] && return 0
+  # FROM THE GIT REMOTE, NOT FROM THE API. `gh repo view` is a GraphQL call, and GraphQL has its
+  # own quota: measured exhausted (5000/5000) on a working day while REST still had headroom. With
+  # the API version, every role's queue became "no repository" the moment that quota ran out —
+  # an outage in one subsystem silently disabling the thing that tells every agent what to do.
+  # The remote URL is already on disk and answers the same question.
+  local url
+  url=$(git config --get remote.origin.url 2>/dev/null || echo "")
+  if [ -n "$url" ]; then
+    REPO=$(printf '%s' "$url" | sed -E 's#^(https://[^/]+/|git@[^:]+:)##; s#\.git$##')
+  fi
+  # Only then the API, for a checkout with no origin.
+  [ -n "${REPO:-}" ] || REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || echo "")
+  [ -n "${REPO:-}" ] || { echo "::error::no repository: this checkout has no 'origin' remote and the API could not be asked. Set REPO." >&2; exit 2; }
 }
 
 # REST, not GraphQL: the shared GraphQL quota was measured exhausted (5000/5000) while REST still
@@ -83,7 +95,7 @@ role_queue() {
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | any(startswith("type:")) | not)
              | "  #\(.number)  \(.title)"'
-      emit "UNCLASSIFIED — no area: label, so PRD R7'"'"'s ratio cannot see them:" \
+      emit "UNCLASSIFIED — no area: label, so the R7 ratio cannot see them:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | any(startswith("area:")) | not)
              | "  #\(.number)  \(.title)"'
