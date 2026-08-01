@@ -97,8 +97,12 @@ UAT. No `openspec/` directory means the gate says NOT APPLICABLE; do not create 
 ./scripts/run-gates.sh          # do not assemble the invocation from memory
 ```
 
-It prints what CI prints, and says what it does not cover. **Green here is the bar; discovering the
-bar from a red CI run is not.**
+It prints what CI prints for the framework's gates, and says what it does not cover. **Green here is
+the bar; discovering the bar from a red CI run is not.**
+
+**Except for your own `make ci`** — that one is yours, and it agrees with CI only as far as your
+toolchain is deterministic. A linter whose verdict depends on its version or on how files are passed
+will go green here and red there on one tree. Pin it.
 
 **Unticked tasks are not "ready for QA".** Open boxes say the work is unfinished, and handing it on
 asks somebody else to verify something you have said is not done.

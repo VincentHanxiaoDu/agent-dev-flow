@@ -158,13 +158,21 @@ run "branch and commits" "$here/check-naming.sh" "$branch" "$base"
 # purpose is that an invocation assembled from memory is a place for memory to be wrong.
 if [ -f Makefile ] && grep -qE '^ci:' Makefile; then
   run "build and tests" make ci
+  # PARITY IS GUARANTEED FOR THE FRAMEWORK'S GATES AND NOT FOR YOURS. This runs YOUR `make ci`, and
+  # whether it answers the same here as on the runner is a property of your toolchain, not of this
+  # script. Measured: a linter whose diagnostics depend on how files are passed and on its version
+  # gave a green here and a red in CI on the same tree — the exact failure this file exists to
+  # prevent, arriving through the one gate it does not own.
+  printf '        (your `make ci` — parity with CI depends on your toolchain, not on this runner:\n'
+  printf '         pin your linter'"'"'s version and severity or the two can disagree on one tree)\n'
 else
   printf '  --    build and tests (no ci: target in a Makefile — CI errors on this if you have tests)\n'
 fi
 
 echo
 if [ "$rc" -eq 0 ]; then
-  echo "all gates pass. This is what CI runs, with the arguments CI uses."
+  echo "all gates pass — the framework's gates, with the arguments CI uses. Your own build is above,"
+  echo "and it agrees with CI only as far as your toolchain is deterministic."
   echo "It does NOT run the review gate — that needs a second agent, and a pass here says nothing"
   echo "about it. A dev agent's pull request ENDS red on that status; that is the handoff, not a"
   echo "failure of yours."
