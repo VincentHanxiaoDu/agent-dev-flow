@@ -36,6 +36,10 @@ against the released commit all reported `skipped`.
 **If nothing ran on this sha, the release notes say that.** It is a fact about the release, not a
 reason not to cut it.
 
+**A `skipped` check is not a pass.** Find out why it was skipped and say so by name — the review
+gate is skipped on a push by design, and a gate that never ran because something broke looks
+identical from the list.
+
 **A red on the target sha is your call, and it is the common case.** A machinery failure — a gate
 about the process rather than the product — does not block a release; a failing product gate does.
 Say which it was, by name, in the notes.
@@ -59,6 +63,9 @@ gh api ... -F prerelease=true
 
 **The number is yours.** `v0.0.x` for something you would not tell a stranger to install; `v0.x.y`
 once its main path works.
+
+**The two are independent axes** — the number says how finished it is, the flag says whether to
+trust it yet. `v0.1.0-rc.1` with `prerelease=true` is a coherent answer, not a hedge.
 
 ## 5. Tag
 

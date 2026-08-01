@@ -70,8 +70,16 @@ report, not a green check.
 ## 6. On an OpenSpec project, archive — and expect it to cost a review round
 
 ```bash
-openspec archive <change>
+openspec archive <change> --yes        # it prompts without --yes
 ```
+
+**Archiving stamps `## Purpose` as `TBD` and asks you to write it. That section is yours** — the
+generated-files gate permits an edit confined to it and refuses every other line.
+
+**On a stack, merge the lower pull request with a MERGE COMMIT, not a squash.** Both branches
+regenerate the same spec file; squashing replaces the commit the upper one is stacked on, and it
+lands in an add/add conflict that costs a rebase, a moved sha, and a third review of a pull request
+already approved twice. The cost surfaces one pull request later than the choice.
 
 **Archiving is a commit, and a commit invalidates the review.** A pull request reaches you already
 approved, so pushing the archive moves the head sha and the review status does not follow it. That
@@ -93,6 +101,10 @@ wrong, fix it in the change and let archiving regenerate it.
 ```
 UAT passed -> merge -> close the Issue
 ```
+
+**An Issue carrying open decisions cannot just be closed.** Closing it destroys them. Carry them
+into a new Issue verbatim — with what the build does in each open region — and say on the closure
+where they went.
 
 ## 8. The release
 
