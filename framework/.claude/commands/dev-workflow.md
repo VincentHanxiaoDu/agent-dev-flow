@@ -19,9 +19,8 @@ Monitor(command: "./scripts/watch-prs.sh dev 60",   description: "your PRs", per
 
 **A failed lookup is not an empty queue** — if `queue.sh` exits non-zero you have **not learned that you have no work**. Retry or report; never proceed as though it were empty.
 
-**A `FAILING` or `CHANGES` event is work.** The event names the branch and the gate's message, but a
-pull request can be red for more than one reason at once — **read every check and every status on
-the head sha before you believe you have the whole picture.**
+**A `FAILING` or `CHANGES` event is work.** `./scripts/pr.sh state <n>` is the whole picture — a
+pull request can be red for more than one reason at once.
 
 ## 2. Work all of it in parallel
 
@@ -67,17 +66,19 @@ bar from a red CI run is not.**
 **Unticked tasks are not "ready for QA".** Open boxes say the work is unfinished, and handing it on
 asks somebody else to verify something you have said is not done.
 
-Then open the pull request and arm auto-merge. **Read back that it armed** — the CLI exits 0 while
-refusing, and some repositories disallow it entirely; if so, say so on the PR rather than retrying.
+```bash
+./scripts/pr.sh open <branch> "<title>" <body-file>
+./scripts/pr.sh arm  <number>       # reads back — the CLI exits 0 while refusing
+./scripts/pr.sh state <number>      # every check AND every status, with the verdict
+```
 
 **A commit-shape failure is an amend and a `--force-with-lease`, not a new commit — and a
 force-push invalidates the review.** You cannot fix that yourself. Ask for a re-review.
 
 ## 5. Not yours
 
-**You close nothing. You merge nothing. You do not review your own work.** A green `Review gate ran`
-check means the evaluation happened; the verdict is the commit status, and it is `failure` until an
-independent agent posts one.
+**You close nothing. You merge nothing. You do not review your own work.** `pr.sh state` shows why:
+a green check run means the job ran; the verdict is the commit status below it.
 
 Findings along the way: **open at most one new Issue**, the rest as comments on the rolling debt
 Issue. Label every Issue `area:product` or `area:machinery`.
