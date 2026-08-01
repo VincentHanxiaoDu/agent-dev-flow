@@ -55,8 +55,10 @@ shows that thing as **deleted** — a serious false finding about work nobody di
 - **Run a control on any empty result.** Point the same query at something you know exists. A broken
   pattern and a genuine absence look identical.
 - **Work in your own worktree or a fresh clone.** Other roles are in this repository now.
-  **Do not delete the working directory to make one.** `.claude/commands/` — including this file —
-  is gitignored, so it exists only there; a clone does not carry it and `rm -rf` destroys it.
+  **Do not delete the working directory to make one** — `.claude/commands/`, including this file, is
+  gitignored and exists only there. **Clone full, or fetch every ref**: `--depth` or
+  `--single-branch` leaves `origin/<branch>` unresolvable and the failure reads as a missing
+  branch.
 
 ## 4. What to look for that a gate cannot
 
@@ -108,8 +110,15 @@ poll still shows the old one.
 
 ## 6. If it is stacked on another pull request
 
-**Verify the shared commit by sha, not by diff** — `git rev-parse <parent-branch>@{u}` against the
-commit in this branch. "Byte-identical, will fast-forward" is a claim like any other.
+**Verify the shared commit by sha, not by diff:**
+
+```bash
+git rev-parse origin/<parent-branch>        # must equal
+git rev-parse <this-head>^
+```
+
+Same object, not merely same ancestry. "Byte-identical, will fast-forward" is a claim like any
+other. (`@{u}` needs a local branch and there is none in a fresh clone.)
 
 **Review the delta and say so.** The merge base is still `main`, so the diff carries the parent's
 work; narrowing to the delta is legitimate, and stating that you did is what makes it legitimate.
@@ -122,6 +131,10 @@ behaviour is where an interaction would sit, say so — the verifier is the only
 **Read the prior review and the author's reply, then verify the earlier finding yourself.** A fix
 note is a claim. Unaddressed items from the previous reviewer carry forward unless you have checked
 them.
+
+**And re-drive what they cleared, when the fix reached it.** A change to the tests invalidates their
+mutation results; a change to the code invalidates their reading of it. Inheriting a table that was
+about a different file is how a fix that makes an assertion vacuous gets waved through.
 
 ## 8. Refuse it if it is wrong
 
