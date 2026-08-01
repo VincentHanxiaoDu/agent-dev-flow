@@ -34,6 +34,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          # THE PULL REQUEST'S OWN HEAD, NOT THE SYNTHETIC MERGE COMMIT. On a `pull_request` event
+          # GitHub checks out `refs/pull/N/merge` by default — a commit it created, whose subject is
+          # `Merge <sha> into <sha>`. Measured on the first real run: this gate failed a 92-character
+          # subject nobody wrote. A gate judging an artefact of the CI system rather than the work is
+          # worse than no gate; it is red for a reason the author cannot act on.
+          ref: ${{ github.event.pull_request.head.sha }}
           # THE GATES READ A COMMIT RANGE, so they need the history. Without this they cannot
           # compute the range and refuse — correctly, but on every run, for the wrong reason.
           fetch-depth: 0
@@ -65,7 +71,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
+        with: { ref: "${{ github.event.pull_request.head.sha }}", fetch-depth: 0 }
       # PASSES ON A PROJECT THAT DOES NOT USE OPENSPEC, and says so. A gate that blocks every pull
       # request in a repository it does not apply to is worse than no gate: nothing merges, and the
       # reason is invisible until someone reads a log.
@@ -78,7 +84,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
+        with: { ref: "${{ github.event.pull_request.head.sha }}", fetch-depth: 0 }
       - run: ./scripts/check-generated.sh "${{ github.event.pull_request.base.sha }}"
 
   build:
@@ -88,6 +94,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+        with: { ref: "${{ github.event.pull_request.head.sha }}" }
       # THE PROJECT'S OWN BUILD, IF IT HAS ONE. An absent Makefile target is not a failure — this
       # framework installs into projects that have not been built yet — but it is SAID, so a green
       # here is never mistaken for "the tests passed".
