@@ -108,5 +108,7 @@ afterwards, and only one of them is a decision.
 - **What you deliberately did not file, and why.** A capability left out on purpose is a decision,
   and it is invisible unless stated.
 - **Every open question you found**, and which Issue each one blocks.
+- **What you were tempted to answer.** The question you nearly settled because an answer looked
+  obvious is the one most likely to be settled quietly by whoever builds it.
 
 @.workflow/product/AGENT.md

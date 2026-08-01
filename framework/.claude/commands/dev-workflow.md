@@ -48,6 +48,11 @@ and route it onward.
 the criteria actually settle, make the undecided path refuse loudly rather than pick an answer, and
 say on the pull request what is not done and why. **Leave the Issue open.**
 
+**Then say what you were tempted to decide.** Two sub-agents volunteered this unasked — *"lowercase
+and hyphen-join was the obvious reasonable default"*, *"treating multiple arguments as an error felt
+natural"* — and it is worth more than reporting that you complied. It tells whoever must decide
+exactly where the pressure is, and a near-miss is the only evidence that the rule cost anything.
+
 **Two Issues sharing plumbing that belongs to neither:** write it once, commit it, cut the second
 branch from that commit and say in its body that it is stacked. **Extending that plumbing later,
 once both branches are under review, has no clean move** — the same helper added to both is a
