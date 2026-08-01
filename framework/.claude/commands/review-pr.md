@@ -22,13 +22,28 @@ That is the whole of it. Restating what CI proved is not a check, it is a delay.
 ## 2. Get the real diff, not the apparent one
 
 ```bash
-./scripts/pr.sh state <n>          # every check AND every status, with the verdict
-git fetch origin
-git diff $(git merge-base origin/main <branch>)..<branch>
+REPO=$(git config --get remote.origin.url | sed -E 's#^(https://[^/]+/|git@[^:]+:)##; s#\.git$##')
+gh api "repos/$REPO/pulls/<n>"                     # body, head sha, branch — the Issue is in `Closes #N`
+gh api "repos/$REPO/issues/<n>/comments"           # prior reviews and the author's replies
+./scripts/pr.sh state <n>                          # every check AND every status, with the verdict
 ```
 
-**Diff from the merge base.** A branch cut before something else landed shows that thing as
-*deleted* — a reviewer who skips this files a serious false finding about work nobody did.
+**Establish your own independence before anything else** — the gate will refuse you, but finding
+out from a red status wastes the whole review:
+
+```bash
+git log --format='%b' $(git merge-base origin/main <branch>)..<branch> | grep '^Agent:'
+```
+
+**Diff from the merge base, not the tip:**
+
+```bash
+git diff origin/main..<branch>                                   # WRONG
+git diff $(git merge-base origin/main <branch>)..<branch>        # right
+```
+
+The wrong one is the one that comes naturally, and on a branch cut before something else landed it
+shows that thing as **deleted** — a serious false finding about work nobody did.
 
 ## 3. Method
 
@@ -69,12 +84,23 @@ gh api -X POST "repos/$REPO/issues/<n>/comments" -F body=@<file>
 Then, in your own words: **what you drove, what you found, and what you could not check.** An
 unstated limit is worse than a known gap.
 
-**The status takes a moment.** The comment triggers a re-run; the first poll after posting will
-still show the old verdict.
+**Then poll until the status flips.** The comment triggers a re-run and the first poll still shows
+the old verdict. **An approve is not finished work until `pr.sh state` agrees** — a reviewer that
+posts and leaves has left the pull request looking red.
 
-## 6. Refuse it if it is wrong
+## 6. If this is a re-review
 
-A `changes-requested` with a concrete finding is a better outcome than a rubber stamp. **You are not
+**Read the prior review and the author's reply, then verify the earlier finding yourself.** A fix
+note is a claim. Unaddressed items from the previous reviewer carry forward unless you have checked
+them.
+
+## 7. Refuse it if it is wrong
+
+A `changes-requested` **with a stated remedy** is a better outcome than a rubber stamp — a finding
+that names the fix is one commit away from closed; one that only names the problem is a negotiation.
+
+**A concern that is neither blocking nor nothing goes in the prose**, named as accepted. The verdict
+is binary and most findings are not. **You are not
 here to unblock anybody** — you are the only check on the two questions no test answers.
 
 **You do not merge, and you do not close.** A verifier does that after you.
