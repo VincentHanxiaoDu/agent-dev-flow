@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Gate 2 of 5: the branch name and every commit subject in this PR.
+#
+# Usage: check-naming.sh <branch> <base-sha>
+#        check-naming.sh --self-test
+set -euo pipefail
+
+case "${1:-}" in
+  -*) [ "$1" = "--self-test" ] || {
+        echo "::error::unknown option '$1'. This is a typo, not an argument — refusing." >&2; exit 2; } ;;
+esac
+
+MAX_SUBJECT=72
+TYPES='feat|fix|chore|docs|test|refactor|perf|build|ci|spec'
+
+run_gate() {
+  local branch=$1 base=${2:-} rc=0 sha subject
+
+  # A MISSING BASE MUST REFUSE, NOT CHECK LESS. The previous build's version validated the branch
+  # name only and exited 0 when given no base — an agent reported `check-naming rc=0` twice and CI
+  # then went red on an over-long subject. The exit code was real; the check was strictly weaker
+  # than the one being claimed, and nothing in the output said so.
+  [ -n "$base" ] || {
+    echo "::error::no base sha given, so no commit subject was examined. Refusing rather than reporting a pass on the branch name alone." >&2
+    return 1
+  }
+  git rev-parse --verify --quiet "$base^{commit}" >/dev/null || {
+    echo "::error::base commit '$base' is not in this clone, so the commit range cannot be computed. This is a CHECKOUT problem (needs fetch-depth: 0) and NOT a statement that the commits are well-formed." >&2
+    return 1
+  }
+
+  # <role>/<type>/<issue>-<slug>
+  if ! printf '%s' "$branch" | grep -qE "^(dev|qa|product|ops|flow)/($TYPES)/[0-9]+-[a-z0-9-]+$"; then
+    echo "::error::branch '$branch' is not <role>/<type>/<issue>-<slug>" >&2
+    echo "  e.g. dev/fix/42-unwritable-store" >&2
+    rc=1
+  fi
+
+  while read -r sha; do
+    [ -n "$sha" ] || continue
+    subject=$(git log -1 --format=%s "$sha")
+    if ! printf '%s' "$subject" | grep -qE "^($TYPES)(\([a-z0-9-]+\))?: .+"; then
+      echo "::error::$(git rev-parse --short "$sha") subject is not '<type>(<scope>): <subject>': $subject" >&2
+      rc=1
+    fi
+    if [ "${#subject}" -gt "$MAX_SUBJECT" ]; then
+      echo "::error::$(git rev-parse --short "$sha") subject is ${#subject} characters, limit $MAX_SUBJECT: $subject" >&2
+      rc=1
+    fi
+  done < <(git rev-list "$base..HEAD")
+
+  [ "$rc" -eq 0 ] && echo "naming ok: branch and $(git rev-list --count "$base..HEAD") commit subject(s) examined"
+  return "$rc"
+}
+
+self_test() {
+  local tmp rc=0 out me
+  me=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")
+  tmp=$(mktemp -d); trap 'rm -rf "$tmp"' RETURN
+
+  _repo() {
+    git -C "$1" init -q -b main; git -C "$1" config user.email t@t; git -C "$1" config user.name t
+    echo x > "$1/f"; git -C "$1" add -A; git -C "$1" commit -qm "chore: seed"
+    git -C "$1" rev-parse HEAD
+  }
+
+  # 1. A MISSING BASE MUST REFUSE. This is the defect the gate exists for and it passed before.
+  mkdir -p "$tmp/a"; _repo "$tmp/a" >/dev/null
+  out=$( cd "$tmp/a" && bash "$me" dev/fix/1-ok 2>&1 ) && { echo "SELF-TEST FAIL: a missing base PASSED — the gate reported ok having examined no commit" >&2; rc=1; }
+  case "$out" in *"no commit subject was examined"*) : ;; *) echo "SELF-TEST FAIL: a missing base gave no explanation" >&2; rc=1 ;; esac
+
+  # 2. An unreachable base must refuse and must NOT read as well-formed.
+  out=$( cd "$tmp/a" && bash "$me" dev/fix/1-ok deadbeefdeadbeefdeadbeefdeadbeefdeadbeef 2>&1 ) \
+    && { echo "SELF-TEST FAIL: an unreachable base PASSED" >&2; rc=1; }
+  case "$out" in *"not in this clone"*) : ;; *) echo "SELF-TEST FAIL: an unreachable base gave no explanation" >&2; rc=1 ;; esac
+
+  # 3. A well-formed branch and subject must PASS.
+  mkdir -p "$tmp/b"; b=$(_repo "$tmp/b")
+  echo y > "$tmp/b/g"; git -C "$tmp/b" add -A; git -C "$tmp/b" commit -qm "fix(store): refuse an unwritable store"
+  ( cd "$tmp/b" && bash "$me" dev/fix/42-unwritable-store "$b" ) >/dev/null 2>&1 \
+    || { echo "SELF-TEST FAIL: a well-formed branch and subject were rejected" >&2; rc=1; }
+
+  # 4. A bad branch name must FAIL.
+  ( cd "$tmp/b" && bash "$me" my-branch "$b" ) >/dev/null 2>&1 \
+    && { echo "SELF-TEST FAIL: a malformed branch name PASSED" >&2; rc=1; }
+
+  # 5. AN OVER-LONG SUBJECT MUST FAIL — measured at exactly one over the limit, because a
+  #    boundary written as > vs >= is the difference between catching it and not, and this rule
+  #    caught a real agent twice at 73 characters.
+  mkdir -p "$tmp/c"; c=$(_repo "$tmp/c")
+  local long; long="fix(store): $(printf 'x%.0s' $(seq 1 $((MAX_SUBJECT - 11))))"
+  [ "${#long}" -eq $((MAX_SUBJECT + 1)) ] || { echo "SELF-TEST FAIL: the fixture is ${#long} chars, meant to be $((MAX_SUBJECT+1)) — refusing to report a boundary test that did not test the boundary" >&2; rc=1; }
+  echo z > "$tmp/c/h"; git -C "$tmp/c" add -A; git -C "$tmp/c" commit -qm "$long"
+  ( cd "$tmp/c" && bash "$me" dev/fix/1-ok "$c" ) >/dev/null 2>&1 \
+    && { echo "SELF-TEST FAIL: a subject one character over the limit PASSED" >&2; rc=1; }
+
+  [ "$rc" -eq 0 ] && echo "self-test passed: a missing or unreachable base refuses, good input passes, and a subject one over the limit fails"
+  return "$rc"
+}
+
+case "${1:-}" in
+  --self-test) self_test ;;
+  "") echo "usage: check-naming.sh <branch> <base-sha> | --self-test" >&2; exit 2 ;;
+  *) run_gate "$1" "${2:-}" ;;
+esac
