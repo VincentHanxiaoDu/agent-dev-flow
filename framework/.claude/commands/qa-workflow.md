@@ -55,7 +55,20 @@ construction — there is rarely anything to serialise.
 - **If the result that would let you close comes back empty, run a control** — point the same query
   at something you know exists. A broken pattern and a real absence look identical.
 
-## 5. Then
+## 5. What CI has already established, and what it has not
+
+The gates are green before you look, so **do not re-run them as your verification** — they prove
+the mechanical half and say nothing about behaviour.
+
+| Already established | Still yours |
+|---|---|
+| every task ticked, naming, generated files untouched, build green | **that the Issue's acceptance criteria actually hold when driven** |
+
+**On an OpenSpec project:** a bug or chore normally touches no change directory. **If one does, its
+tasks are already ticked or CI would be red — a ticked box is a claim, not evidence.** Drive the
+behaviour anyway. **You do not archive**; that is product's act, on features, after UAT.
+
+## 6. Then
 
 ```
 verified -> merge -> close the Issue
@@ -67,7 +80,7 @@ with no stated evidence is not.
 **FAIL is a full outcome** — return it to dev with what you saw. Do not fix it yourself; you would
 then be verifying your own work.
 
-## 6. Not yours
+## 7. Not yours
 
 **Features go to product for UAT.** You do not close them.
 

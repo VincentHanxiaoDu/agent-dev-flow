@@ -58,7 +58,14 @@ report, not a green check.
   values — record them rather than rounding to pass or fail.
 - State which build you drove it on.
 
-## 5. If this project uses OpenSpec, archive before the merge
+## 5. The bar before you close, and what CI checks
+
+| Gate | What it requires of you |
+|---|---|
+| **Tasks complete** | Every task ticked. dev should have done this; **if a box is open, the work is not finished and UAT is premature** — send it back rather than pass it. |
+| **Generated files not hand-authored** | `openspec/specs/**` changes **only** through archiving. An edit arriving without one fails. |
+
+## 6. On an OpenSpec project, archive before the merge
 
 ```bash
 openspec archive <change>
@@ -71,13 +78,13 @@ splitting it into a follow-up leaves `main` claiming work is in flight that has 
 `Generated files not hand-authored` gate fails an edit that arrives without an archive. If a spec is
 wrong, fix it in the change and let archiving regenerate it.
 
-## 6. Then
+## 7. Then
 
 ```
 UAT passed -> merge -> close the Issue
 ```
 
-## 7. The release
+## 8. The release
 
 You call it; `/release-version` executes it. Before you do:
 
@@ -86,7 +93,7 @@ You call it; `/release-version` executes it. Before you do:
 
 **Do not wait for a clean board.** Wait for a release you believe in, and no longer.
 
-## 8. Scope is yours; the owner's rulings are not
+## 9. Scope is yours; the owner's rulings are not
 
 Record a ruling **verbatim, in its original wording**. If a reading of it is load-bearing, ask.
 **Moving scope to make something pass is never yours.**

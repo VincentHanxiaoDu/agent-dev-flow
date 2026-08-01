@@ -77,6 +77,14 @@ run_check() {
   grep -qi 'openspec archive' "$dir/product-workflow.md" 2>/dev/null \
     || { echo "::error::product-workflow.md does not say to archive, but a CI gate fails a spec edit that arrives without one" >&2; rc=1; }
 
+  # EVERY ROLE MUST KNOW THE BAR IT HANDS OFF AT. A role that learns a gate's requirement from a red
+  # check has already asked the next role to verify work it had itself called unfinished. The
+  # standard belongs in the prompt, before the handoff, not in the failure afterwards.
+  for role in dev-workflow qa-workflow product-workflow; do
+    grep -qi 'tasks complete\|every task ticked\|task in .tasks.md. ticked' "$dir/$role.md" 2>/dev/null \
+      || { echo "::error::$role.md never states the Tasks complete standard — the role would meet it by going red" >&2; rc=1; }
+  done
+
   # WRITING REQUIREMENTS: a criterion that can be softened to make it reachable is not a criterion,
   # and the previous build produced one Issue carrying 247 of them in a single milestone.
   grep -qi 'testable or it is not a criterion' "$dir/create-feature.md" 2>/dev/null \
