@@ -133,11 +133,21 @@ run "tasks complete"  "$here/check-tasks-complete.sh" "$base"
 run "generated files" "$here/check-generated.sh" "$base"
 run "branch and commits" "$here/check-naming.sh" "$branch" "$base"
 
+# THE PROJECT'S OWN BUILD, BECAUSE CI RUNS IT AND THIS FILE CLAIMS TO BE WHAT CI RUNS. It did not,
+# and said "this is what CI runs" anyway — a false claim in the output of the tool whose entire
+# purpose is that an invocation assembled from memory is a place for memory to be wrong.
+if [ -f Makefile ] && grep -qE '^ci:' Makefile; then
+  run "build and tests" make ci
+else
+  printf '  --    build and tests (no ci: target in a Makefile — CI errors on this if you have tests)\n'
+fi
+
 echo
 if [ "$rc" -eq 0 ]; then
   echo "all gates pass. This is what CI runs, with the arguments CI uses."
-  echo "It does NOT run: your project's build and tests, or the review gate — the first needs your"
-  echo "toolchain and the second needs a second agent. A pass here says nothing about either."
+  echo "It does NOT run the review gate — that needs a second agent, and a pass here says nothing"
+  echo "about it. A dev agent's pull request ENDS red on that status; that is the handoff, not a"
+  echo "failure of yours."
 else
   echo "at least one gate failed. Each line above is the gate's own output."
 fi

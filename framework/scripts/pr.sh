@@ -14,7 +14,8 @@
 #     entirely. An agent that does not read back reports an armed pull request that is not armed.
 #
 # Usage: pr.sh open <branch> <title> <body-file>
-#        pr.sh state <number>
+#        pr.sh state <number> [--brief]     exits 1 on red, 2 on no answer yet — so it kills an
+#                                            `&&` chain by design; use `;` or check $? .
 #        pr.sh arm <number>
 #        pr.sh --self-test
 set -euo pipefail

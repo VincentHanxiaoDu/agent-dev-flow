@@ -31,14 +31,26 @@ serialise only if they edit the same file. No cap on width.**
 lock.
 
 ```bash
-git worktree add ../wt-<issue> -b dev/<type>/<issue>-<slug> origin/main
+git worktree add "../$(basename "$PWD")-wt-<issue>" -b dev/<type>/<issue>-<slug> origin/main
 ```
+
+**Name it after this repository.** A bare `../wt-<issue>` collides with one left by another project,
+and `git worktree add` creates the branch *before* it fails on the directory — so a retry hits "branch
+already exists" too.
 
 Each sub-agent gets its Issue, worktree, scope and acceptance criteria. **It cannot ask you
 questions.**
 
 **An Issue already satisfied on `main` gets no branch** — drive it to be sure, say so on the Issue,
 and route it onward.
+
+**An Issue whose `## Blocked on a decision` blocks the work is not yours to unblock.** Build what
+the criteria actually settle, make the undecided path refuse loudly rather than pick an answer, and
+say on the pull request what is not done and why. **Leave the Issue open.**
+
+**Two Issues sharing plumbing that belongs to neither:** write it once, commit it, cut the second
+branch from that commit and say in its body that it is stacked. That is honest; duplicating it or
+pretending it belongs to whichever Issue came first is not.
 
 ## 3. Principles
 
@@ -79,7 +91,10 @@ force-push invalidates the review.** You cannot fix that yourself. Ask for a re-
 
 ## 5. Not yours
 
-**You close nothing. You merge nothing. You do not review your own work.** `pr.sh state` shows why:
+**You close nothing. You merge nothing. You do not review your own work.**
+
+**Your pull request ends RED on the review status. That is the handoff, not a failure of yours** —
+it clears when an independent agent posts a verdict, and you are not allowed to be that agent. `pr.sh state` shows why:
 a green check run means the job ran; the verdict is the commit status below it.
 
 Findings along the way: **open at most one new Issue**, the rest as comments on the rolling debt
