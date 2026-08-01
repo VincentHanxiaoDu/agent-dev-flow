@@ -113,11 +113,12 @@ poll still shows the old one.
 **Verify the shared commit by sha, not by diff:**
 
 ```bash
-git rev-parse origin/<parent-branch>        # must equal
-git rev-parse <this-head>^
+git merge-base origin/<parent-branch> <this-head>    # must equal
+git rev-parse origin/<parent-branch>
 ```
 
-Same object, not merely same ancestry. "Byte-identical, will fast-forward" is a claim like any
+Same object, not merely same ancestry. (`<this-head>^` works only while the upper branch is one
+commit long, which it stops being the moment it answers a review.) "Byte-identical, will fast-forward" is a claim like any
 other. (`@{u}` needs a local branch and there is none in a fresh clone.)
 
 **Review the delta and say so.** The merge base is still `main`, so the diff carries the parent's
@@ -150,5 +151,11 @@ is binary and most findings are not. **You are not
 here to unblock anybody** — you are the only check on the two questions no test answers.
 
 **You do not merge, and you do not close.** A verifier does that after you.
+
+**If no second agent exists and you must do both,** say so in the verdict and again wherever the
+work is announced. Reviewing and then merging your own verdict is independence from the AUTHOR and
+not from the REVIEWER — nothing checks your judgement before it becomes irreversible. Re-derive the
+prior findings yourself rather than reading a table, and name the gap; it is a real one and the
+process does not close it.
 
 @.workflow/reviewer/AGENT.md

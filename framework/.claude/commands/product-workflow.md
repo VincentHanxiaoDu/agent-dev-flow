@@ -48,6 +48,10 @@ someone to tell you twice.
 
 ## 4. UAT
 
+**If you also reviewed what you are about to merge, say so** — in the verdict and in the release
+notes. It is independence from the author, not from the reviewer, and no second pair of eyes exists
+at the merge boundary. Drive the findings yourself rather than inheriting a table.
+
 **YOU ARE THE ONLY ROLE THAT SEES THE COMBINATION.** Every gate certifies one head against `main`,
 and every reviewer reads one branch — so if two pull requests interact, nobody has driven it. **UAT
 the merged tree**, and when a criterion cannot be met on one branch alone, say which build you drove
