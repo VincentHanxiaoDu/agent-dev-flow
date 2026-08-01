@@ -29,12 +29,20 @@ run_gate() {
     return 1
   }
 
+  # THE DEFAULT BRANCH IS NOT A WORK BRANCH. `main` cannot match `<role>/<type>/<issue>-<slug>`, so
+  # this gate failed every time it ran there — including on the one occasion it legitimately does,
+  # a release. A red that is guaranteed and meaningless trains a reader to ignore a red gate at
+  # exactly the moment they should not.
+  case "$branch" in
+    main|master|HEAD) echo "  branch: '$branch' is the default branch, so the work-branch pattern does not apply" ;;
+    *)
   # <role>/<type>/<issue>-<slug>
   if ! printf '%s' "$branch" | grep -qE "^(dev|qa|product|ops|flow)/($TYPES)/[0-9]+-[a-z0-9-]+$"; then
     echo "::error::branch '$branch' is not <role>/<type>/<issue>-<slug>" >&2
     echo "  e.g. dev/fix/42-unwritable-store" >&2
     rc=1
-  fi
+  fi ;;
+  esac
 
   while read -r sha; do
     [ -n "$sha" ] || continue
