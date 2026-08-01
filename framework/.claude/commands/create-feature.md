@@ -35,12 +35,13 @@ labels: type:feature | type:bug | type:chore   AND   area:product | area:machine
 body:
   ## The journey            — what the person is doing and why, in their words
   ## Acceptance criteria    — numbered, each independently drivable
-  ## Blocked on a decision  — only if section 2 applies
+  ## Blocked on a decision  — only if section 2 applies; say what must be decided, not who
 ```
 
 **Dependencies are the parent's second pass, not a sub-agent's section.** Filing simultaneously means
-no sub-agent knows another's number, so it cannot name one. Add them by comment once every Issue
-exists, or leave them out.
+no sub-agent knows another's number. **Do the second pass when one Issue's answer constrains
+another's** — a shared decision, an ordering that is real. Skip it when they only sit near each
+other.
 
 **`<scope>`** is one lowercase word for the area — `display`, `combat`, `store`. **Choose the vocabulary
 once, before fanning out, and hand the list to every sub-agent** — left to themselves they produce
@@ -60,6 +61,12 @@ implementation task rather than a capability.
 **Write criteria for what must NOT happen.** A missing value and a real value must never produce the
 same output — that case is where defects live, and it is the one nobody writes down.
 
+**When a negative criterion needs a detail the specification never fixed, assert the
+DISTINGUISHABILITY and list the detail as open.** "Exits non-zero with stdout empty, distinguishable
+from success by exit code alone" is drivable and settles nothing. "Exits 2 with `error: empty
+slug`" is a guess wearing a criterion's clothes — §2 forbids it, and this is the seam where it
+sneaks back in.
+
 **Never soften a criterion to make it reachable.** If it names something that does not exist yet,
 that is the point of filing it.
 
@@ -76,7 +83,8 @@ gh api "repos/$REPO/issues?state=open" --jq '.[].title'   # what is already file
 **Skip a capability that already has an Issue.** Run twice on one specification, this files the whole
 set again — and a duplicate board is harder to clean than it was to create.
 
-Then **one sub-agent per capability, started together. No cap on width.** Give each its capability,
+Then **one sub-agent per capability, started together. No cap on width** — though at two or three
+capabilities, writing them yourself is faster than briefing anyone. Give each its capability,
 the shared scope vocabulary, and the specification. **Tell each to return its Issue number and every
 open question it recorded** — you cannot report on a body you did not write.
 
