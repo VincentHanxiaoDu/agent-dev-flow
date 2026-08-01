@@ -97,7 +97,15 @@ my_prs() {
   local any=0
   while IFS=$'\t' read -r num branch title; do
     [ -n "$num" ] || continue
-    case "$branch" in $match) : ;; *) continue ;; esac
+    # THE PULL REQUEST'S TYPE IS IN ITS BRANCH NAME — `<role>/<type>/<issue>-<slug>`, which the
+    # naming gate already enforces. Routing on it means a chore reaches qa and a feature reaches
+    # product without anything being stored twice. Matching every branch instead put one archive
+    # pull request in both queues at once, and two roles racing to merge the same thing is exactly
+    # the collision this queue exists to prevent.
+    local matched=0 pat
+    IFS='|' read -ra _pats <<< "$match"
+    for pat in "${_pats[@]}"; do case "$branch" in $pat) matched=1; break ;; esac; done
+    [ "$matched" -eq 1 ] || continue
     any=1
     st=$("$(dirname "${BASH_SOURCE[0]}")/pr.sh" state "$num" --brief 2>&1) || true
     printf '  #%-4s %-46s %s\n' "$num" "$(printf '%s' "$title" | cut -c1-46)" "$st"
@@ -136,13 +144,13 @@ role_queue() {
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | index("type:bug") or index("type:chore"))
              | "  #\(.number)  \(.title)"' 
-      my_prs "*" "PULL REQUESTS TO VERIFY (bug/chore), whoever wrote them" ;;
+      my_prs "*/fix/*|*/bug/*|*/chore/*|*/docs/*|*/test/*|*/ci/*|*/build/*|*/refactor/*|*/perf/*" "PULL REQUESTS TO VERIFY, MERGE AND CLOSE — whoever wrote them" ;;
     product)
       emit "FEATURES TO UAT, ARCHIVE, MERGE AND CLOSE:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | index("type:feature"))
              | "  #\(.number)  \(.title)"' 
-      my_prs "*" "PULL REQUESTS TO UAT, whoever wrote them" ;;
+      my_prs "*/feat/*|*/spec/*" "PULL REQUESTS TO UAT, MERGE AND CLOSE — whoever wrote them" ;;
     ops)
       emit "OPEN PULL REQUESTS — CI and gate health:" \
         '.[] | select(.pull_request!=null) | "  #\(.number)  \(.title)"' ;;
