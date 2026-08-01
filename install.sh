@@ -100,6 +100,25 @@ done
 
 printf 'ref=%s\n' "$REF" > "$target/.agent-dev-flow"
 
+# --- the bootstrap command, installed once at the USER level ------------------
+# CHICKEN AND EGG: `/init-workflow` lives in `.claude/commands/`, which does not exist until this
+# script has run. Installing it into the project only would make it useless for the one job it has.
+# At the user level it is available in every repository, so the first setup is a curl and every one
+# after it is a slash command.
+#
+# NEVER OVERWRITTEN. If a person has edited theirs, that edit is theirs to keep — this is the same
+# seam as .workflow/, one level out.
+USER_CMDS="${HOME}/.claude/commands"
+if [ -f "$SRC/.claude/commands/init-workflow.md" ]; then
+  mkdir -p "$USER_CMDS"
+  if [ -f "$USER_CMDS/init-workflow.md" ]; then
+    echo "  = ~/.claude/commands/init-workflow.md (kept)"
+  else
+    cp "$SRC/.claude/commands/init-workflow.md" "$USER_CMDS/init-workflow.md"
+    echo "  + ~/.claude/commands/init-workflow.md — /init-workflow now works in any repository"
+  fi
+fi
+
 # --- what has to be committed, and what does not -----------------------------
 # ONLY CI NEEDS TO BE IN THE REPOSITORY. GitHub Actions runs the workflow and the gate scripts from
 # the repository, so those must be committed. `.claude/commands/` is read by a person's Claude Code

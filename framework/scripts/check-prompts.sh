@@ -30,7 +30,7 @@ run_check() {
 
   # Every role the queue can dispatch must have a prompt. A role with a queue arm and no prompt is
   # a role that receives work and does not know what to do with it.
-  for role in dev-workflow qa-workflow product-workflow create-feature release-version; do
+  for role in dev-workflow qa-workflow product-workflow create-feature release-version init-workflow; do
     [ -f "$dir/$role.md" ] || { echo "::error::no prompt for role '$role'" >&2; rc=1; }
   done
 
