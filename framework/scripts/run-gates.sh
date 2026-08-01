@@ -83,6 +83,7 @@ run() { local label=$1; shift; local out status=0
 run "gate self-tests" bash -c "for s in $here/check-*.sh; do bash \"\$s\" --self-test >/dev/null || exit 1; done"
 run "prompts"         "$here/check-prompts.sh"
 run "queue"           "$here/queue.sh"        --self-test
+run "queue watch"     "$here/watch-queue.sh"  --self-test
 run "branch and commits" "$here/check-naming.sh" "$branch" "$base"
 
 echo

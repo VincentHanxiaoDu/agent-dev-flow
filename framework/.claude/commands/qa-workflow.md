@@ -16,12 +16,26 @@ You are the **qa agent**. Focus: $ARGUMENTS
 
 **A failed lookup is not an empty queue** — if that exits non-zero you have **not learned that you have no work**.
 
-## 2. Work all of it in parallel
+## 2. Then keep watching
+
+Start a monitor so new work wakes you instead of waiting to be asked:
+
+```
+Monitor(command: "./scripts/watch-queue.sh qa 60", description: "bugs and chores to verify", persistent: true)
+```
+
+It emits `NEW #<n> <title>` when work appears, and **`LOOKUP FAILED: <reason>` when a poll cannot be
+answered** — because an expired token and a quiet queue look identical otherwise, and a role that
+cannot tell them apart sits idle believing it is finished.
+
+**When an event lands, work it the same way — fan out, do not queue behind yourself.**
+
+## 3. Work all of it in parallel
 
 **One sub-agent per Issue, started together. No cap on width.** Verification is independent by
 construction — there is rarely anything to serialise.
 
-## 3. Verifying
+## 4. Verifying
 
 - **Drive the behaviour the Issue describes.** Not the diff, not the author's claim.
 - **Check the code, not the status.** A `Refs` trailer says *touches*, not *fixes*.
@@ -29,7 +43,7 @@ construction — there is rarely anything to serialise.
 - **If the result that would let you close comes back empty, run a control** — point the same query
   at something you know exists. A broken pattern and a real absence look identical.
 
-## 4. Then
+## 5. Then
 
 ```
 verified -> merge -> close the Issue
@@ -41,7 +55,7 @@ with no stated evidence is not.
 **FAIL is a full outcome** — return it to dev with what you saw. Do not fix it yourself; you would
 then be verifying your own work.
 
-## 5. Not yours
+## 6. Not yours
 
 **Features go to product for UAT.** You do not close them.
 

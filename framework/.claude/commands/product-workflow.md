@@ -16,11 +16,25 @@ You are the **product agent**. Focus: $ARGUMENTS
 
 **A failed lookup is not an empty queue** — if that exits non-zero you have **not learned that you have no work**.
 
-## 2. Work all of it in parallel
+## 2. Then keep watching
+
+Start a monitor so new work wakes you instead of waiting to be asked:
+
+```
+Monitor(command: "./scripts/watch-queue.sh product 60", description: "features to UAT", persistent: true)
+```
+
+It emits `NEW #<n> <title>` when work appears, and **`LOOKUP FAILED: <reason>` when a poll cannot be
+answered** — because an expired token and a quiet queue look identical otherwise, and a role that
+cannot tell them apart sits idle believing it is finished.
+
+**When an event lands, work it the same way — fan out, do not queue behind yourself.**
+
+## 3. Work all of it in parallel
 
 **One sub-agent per feature, started together. No cap on width.**
 
-## 3. UAT
+## 4. UAT
 
 **Drive the acceptance criteria against a build from the branch.** Not the diff, not the author's
 report, not a green check.
@@ -32,13 +46,13 @@ report, not a green check.
   values — record them rather than rounding to pass or fail.
 - State which build you drove it on.
 
-## 4. Then
+## 5. Then
 
 ```
 UAT passed -> merge -> close the Issue
 ```
 
-## 5. The release
+## 6. The release
 
 You call it; `/release-version` executes it. Before you do:
 
@@ -47,7 +61,7 @@ You call it; `/release-version` executes it. Before you do:
 
 **Do not wait for a clean board.** Wait for a release you believe in, and no longer.
 
-## 6. Scope is yours; the owner's rulings are not
+## 7. Scope is yours; the owner's rulings are not
 
 Record a ruling **verbatim, in its original wording**. If a reading of it is load-bearing, ask.
 **Moving scope to make something pass is never yours.**

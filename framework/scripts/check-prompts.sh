@@ -47,6 +47,11 @@ run_check() {
     # The lookup-failure distinction, in the prompt rather than only in the script.
     grep -qi 'failed lookup and an empty queue are different\|not learned that you have no work' "$f" \
       || { echo "::error::$role.md does not tell the role that a failed lookup is not an empty queue" >&2; rc=1; }
+    # SELF-DRIVING. A role that reads its queue once works one round and stops, and somebody then
+    # has to notice new work and restart it — which is a coordinator, which is the bottleneck this
+    # process exists to remove. The queue is a state the role watches.
+    grep -q 'watch-queue\.sh' "$f" \
+      || { echo "::error::$role.md starts no monitor, so the role works one round and waits to be told about the next" >&2; rc=1; }
   done
 
   # R4 — CLOSURE AUTHORITY LIVES IN THE PROMPT OF THE ROLE THAT CLOSES, and nowhere else.
@@ -81,7 +86,7 @@ run_check() {
       || { echo "::error::$role.md has no @.workflow/<role>/AGENT.md injection point — a project could only extend it by editing a file the installer overwrites" >&2; rc=1; }
   done
 
-  [ "$rc" -eq 0 ] && echo "prompts ok: every role pulls its own queue and fans out uncapped, closure authority is stated where it is exercised, criteria cannot be softened, and every command has its project injection point"
+  [ "$rc" -eq 0 ] && echo "prompts ok: every role pulls its own queue and fans out uncapped, closure authority is stated where it is exercised, criteria cannot be softened, every working role watches its queue, and every command has its project injection point"
   return "$rc"
 }
 

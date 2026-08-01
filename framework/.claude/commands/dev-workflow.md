@@ -14,7 +14,21 @@ You are the **dev agent**. Focus: $ARGUMENTS
 
 **A failed lookup is not an empty queue.** If that exits non-zero you have **not learned that you have no work** — retry or report, never proceed as though it were empty.
 
-## 2. Work all of it in parallel
+## 2. Then keep watching
+
+Start a monitor so new work wakes you instead of waiting to be asked:
+
+```
+Monitor(command: "./scripts/watch-queue.sh dev 60", description: "new Issues to resolve", persistent: true)
+```
+
+It emits `NEW #<n> <title>` when work appears, and **`LOOKUP FAILED: <reason>` when a poll cannot be
+answered** — because an expired token and a quiet queue look identical otherwise, and a role that
+cannot tell them apart sits idle believing it is finished.
+
+**When an event lands, work it the same way — fan out, do not queue behind yourself.**
+
+## 3. Work all of it in parallel
 
 **One sub-agent per Issue, started together.** Not the first, not the most important — every Issue that does not contend with another. **Two Issues serialise only if they edit the same file. No cap on width.**
 
@@ -25,14 +39,14 @@ git worktree add ../wt-<issue> -b dev/<type>/<issue>-<slug> origin/main
 Each sub-agent gets its Issue number, worktree, scope and acceptance criteria. **It cannot ask you
 questions**, so everything it needs goes in what you hand it.
 
-## 3. Principles
+## 4. Principles
 
 - **Break the test and watch it go red.** A test you have not seen fail is not a test.
 - **Run it.** Reading the diff is not verification.
 - ***Could not determine* and *determined to be nothing* must never share an exit code.**
 - **Only what the Issue asked.** Declare any widening in the PR body.
 
-## 4. Ship it
+## 5. Ship it
 
 ```bash
 ./scripts/run-gates.sh          # do not assemble the invocation from memory
@@ -40,7 +54,7 @@ questions**, so everything it needs goes in what you hand it.
 
 Open the PR, arm auto-merge, **read back that it armed** — the CLI exits 0 while refusing.
 
-## 5. Not yours
+## 6. Not yours
 
 **You close nothing. You merge nothing. You do not review your own work.**
 
