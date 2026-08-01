@@ -75,7 +75,7 @@ done < <(manifest)
 chmod +x "$target"/scripts/*.sh
 
 # --- the project's own half, created once and then left alone ----------------
-for role in dev qa product ops; do
+for role in dev qa product ops reviewer; do
   d="$target/.workflow/$role"
   mkdir -p "$d"
   [ -f "$d/AGENT.md" ] && { echo "  = .workflow/$role/AGENT.md (kept)"; continue; }

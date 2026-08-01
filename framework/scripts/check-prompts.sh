@@ -30,7 +30,7 @@ run_check() {
 
   # Every role the queue can dispatch must have a prompt. A role with a queue arm and no prompt is
   # a role that receives work and does not know what to do with it.
-  for role in dev-workflow qa-workflow product-workflow create-feature release-version init-workflow; do
+  for role in dev-workflow qa-workflow product-workflow create-feature release-version init-workflow review-pr; do
     [ -f "$dir/$role.md" ] || { echo "::error::no prompt for role '$role'" >&2; rc=1; }
   done
 
@@ -105,10 +105,21 @@ run_check() {
   grep -qi 'named defect is shippable' "$dir/release-version.md" 2>/dev/null \
     || { echo "::error::release-version.md does not require known limitations to be named" >&2; rc=1; }
 
+  # A REVIEW MUST START FROM THE MERGE BASE. A branch cut before something else landed shows that
+  # thing as deleted, and a reviewer who diffs against the tip files a false finding about work
+  # nobody did — reported after it nearly happened.
+  grep -q 'merge-base' "$dir/review-pr.md" 2>/dev/null \
+    || { echo "::error::review-pr.md does not say to diff from the merge base — a stale branch reads as deleting other people's work" >&2; rc=1; }
+  # AND IT MUST CHECK THAT A BLOCKED DECISION WAS NOT SETTLED IN A TEST. A pull request that says it
+  # settled nothing, whose test pins the undecided behaviour, has settled it — caught exactly once,
+  # by a reviewer that implemented the other permitted answer and watched the suite go red.
+  grep -qi 'in a test as well as in the code\|settled.*in a test' "$dir/review-pr.md" 2>/dev/null \
+    || { echo "::error::review-pr.md does not say a test can settle an open decision the body claims is open" >&2; rc=1; }
+
   # EVERY COMMAND CARRIES ITS PROJECT INJECTION POINT. Without it a project cannot add its own
   # process or knowledge without editing a framework file, and an edit to a framework file is
   # reverted by the next install — silently, which is how a team learns to stop upgrading.
-  for role in dev-workflow qa-workflow product-workflow create-feature release-version; do
+  for role in dev-workflow qa-workflow product-workflow create-feature release-version review-pr; do
     f="$dir/$role.md"; [ -f "$f" ] || continue
     grep -q '@\.workflow/' "$f" \
       || { echo "::error::$role.md has no @.workflow/<role>/AGENT.md injection point — a project could only extend it by editing a file the installer overwrites" >&2; rc=1; }
