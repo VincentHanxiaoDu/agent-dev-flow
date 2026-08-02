@@ -64,7 +64,12 @@ pretending it belongs to whichever Issue came first is not.
 
 ## 3. Principles
 
-- **Break the test and watch it go red.** A test you have not seen fail is not a test.
+- **Break the test and watch it go red.** A test you have not seen fail is not a test. **Including a
+  test somebody asked you for** — one was specified as "assert the two reports differ", and it passed
+  against the build from before the fix, because they already differed.
+- **A test that depends on its environment must PROBE it, not name it.** Picking `en_US.UTF-8` by
+  name and getting `C.utf8` is the same could-not-check-reading-as-checked shape the test existed to
+  catch — it caught one broken spelling on CI and went green against the other.
 - **Run it.** Reading the diff is not verification.
 - ***Could not determine* and *determined to be nothing* must never share an exit code.**
 - **Only what the Issue asked.** Declare any widening in the PR body.
@@ -75,6 +80,10 @@ pretending it belongs to whichever Issue came first is not.
   this; without it no reviewer can be shown to be independent. `run-gates.sh` catches a missing one.
 - **Tick a task when it is done, never to clear a gate.** Work that did not happen gets the list
   trimmed and the remainder filed.
+
+**A fix that must survive an upgrade goes in a project-owned file.** `.claude/`, `.github/` and
+`scripts/` belong to the installer and are replaced wholesale on every refresh — twice in one round,
+mid-flight, while branches were open. Put it in your own files and have the framework's gate read it.
 
 **On an OpenSpec project** every Issue gets a change directory. `Tasks complete` fails on one
 unticked box, and on a `spec-driven` project it also fails a change openspec could not archive:
