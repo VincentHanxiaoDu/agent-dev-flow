@@ -241,6 +241,23 @@ if [ "$protect" = yes ]; then
       else
         echo "  ! the policy was written but reads back with $got contexts, not $want — check it by hand" >&2
       fi
+      # ONLY A TRUE MERGE COMMIT, BECAUSE THAT IS WHAT THE NAMING GATE EXEMPTS. check-naming.sh
+      # skips GitHub's own merge commit by PARENT COUNT — the only reliable signal — and judges
+      # everything else. GitHub's squash and rebase buttons produce SINGLE-parent commits whose
+      # message is composed by GitHub and carries no `Agent:` trailer, so the gate judges them and
+      # the default branch goes red on a commit nobody wrote and nobody can amend. That happened:
+      # two pull requests were squashed and `main`'s naming gate failed with "has no 'Agent:'
+      # trailer" on GitHub's own commit. Turning the buttons off is the fix, because telling every
+      # agent not to press them is not one.
+      if gh api -X PATCH "repos/$SLUG" -F allow_squash_merge=false -F allow_rebase_merge=false \
+           -F allow_merge_commit=true >/dev/null 2>&1; then
+        echo "  merge method: merge commits only (squash and rebase disabled — the naming gate"
+        echo "                exempts a merge commit by its two parents, and nothing else)"
+      else
+        echo "  ! could not disable squash/rebase merging. Merge with a MERGE COMMIT only:" >&2
+        echo "    a squash or rebase merge writes a single-parent commit with no 'Agent:' trailer" >&2
+        echo "    and reddens the default branch's naming gate." >&2
+      fi
     else
       echo "  ! could not protect $branch. Most likely this token lacks admin on the repository," >&2
       echo "    or the repository is on a plan without branch protection. The install itself" >&2
