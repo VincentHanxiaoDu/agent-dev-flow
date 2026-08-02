@@ -1,7 +1,7 @@
 ---
 description: Turn a product description into Issues with testable acceptance criteria.
 argument-hint: <what you want, in prose — or a path to a PRD>
-allowed-tools: Bash, Read, Write, Glob, Grep, Agent
+allowed-tools: Bash, Read, Write, Glob, Grep, Agent, AskUserQuestion
 ---
 
 You are the **product agent**, writing requirements. Input: $ARGUMENTS
@@ -19,16 +19,27 @@ belongs inside the Issue it constrains, where it can be driven. It is not its ow
 **A principle constraining EVERY capability goes into every Issue**, as a criterion each can be
 driven against alone. Filed once, it is nobody's to satisfy.
 
-## 2. Open questions are not requirements — and you never answer one
+## 2. Open questions — ASK, before you file anything
 
-A specification usually contains decisions nobody has made yet. **This is where two runs of this
-command diverge most.**
+A specification usually contains decisions nobody has made yet. **You never answer one yourself.**
+But you are not filing around them either: **an Issue that ships refusing on its own main path is
+waste, and the person who can settle it is one question away.**
 
-- **Do not invent an answer.** A criterion that reads as settled when the decision is open puts a
+**Collect every open question across the whole specification FIRST**, then put them to the owner with
+`AskUserQuestion` — batched, not one at a time. Each needs concrete options, what each one costs, and
+**your recommendation first**. A question with no recommendation asks the owner to do your thinking.
+
+**Only sub-agents cannot ask.** Do this before you fan out, and hand the rulings down.
+
+**Record every ruling verbatim** — the owner's own wording, under `## Ruled` in the Issue it settles.
+Never act on your own reading of one; if a reading is load-bearing, ask again.
+
+**If the owner defers one**, then and only then does it go under `## Blocked on a decision`, and the
+criteria assert only what the specification guarantees. That is the fallback, not the default.
+
+- **Never invent an answer.** A criterion that reads as settled when the decision is open puts a
   guess into code, where nobody will ever see it was a guess.
-- **Do not file the question as an Issue.** A question is not work.
-- **Write it into the body of the Issue it blocks**, under `## Blocked on a decision`, naming who
-  must decide. Then write criteria only for what the specification actually guarantees.
+- **Never file the question as an Issue.** A question is not work.
 
 ## 3. What an Issue carries
 
@@ -38,7 +49,8 @@ labels: type:feature | type:bug | type:chore   AND   area:product | area:machine
 body:
   ## The journey            — what the person is doing and why, in their words
   ## Acceptance criteria    — numbered, each independently drivable
-  ## Blocked on a decision  — only if section 2 applies; say what must be decided, not who
+  ## Ruled                  — the owner's answers, verbatim, to what §2 asked
+  ## Blocked on a decision  — only what the owner DEFERRED; say what must be decided, not who
 ```
 
 **Dependencies are the parent's second pass, not a sub-agent's section.** Filing simultaneously means
@@ -119,7 +131,9 @@ afterwards, and only one of them is a decision.
 - What you filed — number and title.
 - **What you deliberately did not file, and why.** A capability left out on purpose is a decision,
   and it is invisible unless stated.
-- **Every open question you found**, and which Issue each one blocks.
+- **Every question you asked and how it was answered**, and anything the owner deferred.
+- **What you did NOT ask** — a question you resolved from the specification is a reading, and the
+  owner should see the readings you made.
 - **What you were tempted to answer.** The question you nearly settled because an answer looked
   obvious is the one most likely to be settled quietly by whoever builds it.
 

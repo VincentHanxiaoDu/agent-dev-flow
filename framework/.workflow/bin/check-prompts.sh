@@ -99,6 +99,16 @@ run_check() {
   grep -qi 'never answer one\|do not invent an answer' "$dir/create-feature.md" 2>/dev/null \
     || { echo "::error::create-feature.md does not forbid answering the specification's open questions" >&2; rc=1; }
 
+  # AN OPEN DECISION GOES TO THE OWNER BEFORE AN ISSUE IS FILED. Five proving-ground rounds shipped
+  # features that refused on their own main path, because nothing asked — the owner was one question
+  # away each time and the prompt said only "do not answer it yourself".
+  for role in create-feature product-workflow; do
+    grep -q 'AskUserQuestion' "$dir/$role.md" 2>/dev/null \
+      || { echo "::error::$role.md does not put an open decision to the owner — filing around one ships a capability that refuses" >&2; rc=1; }
+  done
+  grep -qi 'before you file anything\|ASK, before' "$dir/create-feature.md" 2>/dev/null \
+    || { echo "::error::create-feature.md does not say to ask BEFORE filing" >&2; rc=1; }
+
   # RELEASING: product decides, ops executes; and an unnamed defect is not shippable.
   grep -qi 'product decides' "$dir/release-version.md" 2>/dev/null \
     || { echo "::error::release-version.md does not state that product decides and ops only executes" >&2; rc=1; }
