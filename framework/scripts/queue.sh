@@ -219,6 +219,14 @@ role_queue() {
       emit "OPEN PULL REQUESTS — CI and gate health:" \
         '.[] | select(.pull_request!=null) | "  #\(.number)  \(.title)"' ;;
     pm)
+      # AN ISSUE WAITING ON A DECISION IS IN NOBODY'S QUEUE, AND THAT IS CORRECT — nobody can build
+      # it. But correct and invisible is an orphan: two Issues sat open, verified, deliberately left
+      # open for the owner, and every role's queue dropped them for a good reason. Work nobody can
+      # do is still work somebody must SEE, and the pm is the only channel to whoever decides.
+      emit "WAITING ON A DECISION — nobody can build these; the owner must answer:" \
+        '.[] | select(.pull_request==null)
+             | select(.body // "" | test("## Blocked on a decision"))
+             | "  #\(.number)  \(.title)"'
       emit "UNTYPED — cannot be routed until they carry a type: label:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | any(startswith("type:")) | not)
