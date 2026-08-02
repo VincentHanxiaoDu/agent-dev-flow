@@ -67,6 +67,9 @@ emit() { # emit <heading> <jq-filter> [--unclaimed]
   # --landed: only Issues whose branch is GONE from the remote, i.e. the work merged and the branch
   # was deleted, or there never was one. An Issue still holding an open branch is somebody else's
   # turn, and showing it here is how a role goes looking for work that does not exist yet.
+  if [ "$skip" = "--landed" ] && [ -n "${VERIFIED:-}" ]; then
+    out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$VERIFIED" | tr '\n' '|' | sed 's/|$//'))  " || true)
+  fi
   if [ "$skip" = "--landed" ]; then
     if [ -n "${OPEN_BRANCH_ISSUES:-}" ]; then
       out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$OPEN_BRANCH_ISSUES" | tr '\n' '|' | sed 's/|$//'))  " || true)
@@ -169,11 +172,21 @@ claimed_issues() {
 role_queue() {
   local role=$1
   ALL=$(issues | jq -s 'add // []')
+  # AN ISSUE YOU HAVE ALREADY VERIFIED IS NOT WORK WAITING FOR YOU. A product agent UAT'd two
+  # Issues, found their criteria unreachable, deliberately left them open and recorded why — and the
+  # queue went on listing them under "UAT and CLOSE", telling the next agent to do work already done.
+  # A queue that repeats finished work is a queue people stop reading.
+  #
+  # The signal is the role's own marked comment, which is where the verdict already lives.
   CLAIMED=$(claimed_issues)
   resolve_repo
   # Issues that still have an open branch: not landed. And issues that have EVER had a pull request,
   # open or merged: the ones whose work exists at all.
   OPEN_BRANCH_ISSUES=$CLAIMED
+  # Issues already carrying this role's own verdict comment.
+  VERIFIED=$(api --paginate "repos/$REPO/issues/comments?per_page=100" \
+    | jq -r --arg r "[$role]" '.[] | select(.body | startswith($r)) | .issue_url' 2>/dev/null \
+    | sed -n 's#.*/issues/##p' | sort -u)
   EVER_BUILT=$(api --paginate "repos/$REPO/pulls?state=all&per_page=100" \
     | jq -r '.[].head.ref' 2>/dev/null \
     | sed -n 's#^[a-z]*/[a-z]*/\([0-9][0-9]*\)-.*#\1#p' | sort -u)
@@ -197,7 +210,7 @@ role_queue() {
              | "  #\(.number)  \(.title)"' --landed 
       my_prs "*/fix/*|*/bug/*|*/chore/*|*/docs/*|*/test/*|*/ci/*|*/build/*|*/refactor/*|*/perf/*" "PULL REQUESTS TO VERIFY, MERGE AND CLOSE — whoever wrote them" ;;
     product)
-      emit "FEATURES WHOSE WORK HAS LANDED — UAT on main and CLOSE:" \
+      emit "FEATURES WHOSE WORK HAS LANDED — UAT on main and CLOSE (already verified ones are dropped):" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | index("type:feature"))
              | "  #\(.number)  \(.title)"' --landed 

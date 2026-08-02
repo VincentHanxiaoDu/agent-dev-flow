@@ -78,6 +78,10 @@ behaviour anyway. **You do not archive**; that is product's act, on features, af
 verified -> merge -> close the Issue
 ```
 
+**Every verdict comment you post starts with `[qa]` on its own first line.** That marker is not
+decoration — it is the only record that you have looked, and `queue.sh` reads it to stop offering you
+work you have already finished. Without it the queue tells the next agent to redo your round.
+
 Say **what you drove and on which build**. `OBSOLETE — not fixed` is an honest closure. A closure
 with no stated evidence is not.
 

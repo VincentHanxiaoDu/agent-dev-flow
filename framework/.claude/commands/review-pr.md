@@ -113,9 +113,14 @@ poll still shows the old one.
 **Verify the shared commit by sha, not by diff:**
 
 ```bash
-git merge-base origin/<parent-branch> <this-head>    # must equal
+git merge-base origin/<parent-branch> <this-head>
 git rev-parse origin/<parent-branch>
 ```
+
+**Equal means a true stack.** Unequal does not mean something is wrong: two branches cut from the
+same plumbing commit are a FORK from a shared ancestor, and the merge base is that ancestor. Verify
+the shared commits are the same objects, and **say which topology it is** — a reviewer reading this
+as an invariant nearly filed a finding about work nobody did.
 
 Same object, not merely same ancestry. (`<this-head>^` works only while the upper branch is one
 commit long, which it stops being the moment it answers a review.) "Byte-identical, will fast-forward" is a claim like any

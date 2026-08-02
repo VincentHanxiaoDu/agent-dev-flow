@@ -105,6 +105,15 @@ run_check() {
   grep -qi 'named defect is shippable' "$dir/release-version.md" 2>/dev/null \
     || { echo "::error::release-version.md does not require known limitations to be named" >&2; rc=1; }
 
+  # THE ROLE MARKER IS THE STATE. queue.sh reads `[qa]` / `[product]` at the start of a comment to
+  # know a role has already looked — it is the one record that exists. A product agent UAT'd two
+  # Issues, deliberately left them open, and the queue went on offering them because its verdict
+  # comment began `## UAT` instead.
+  for role in qa product; do
+    grep -q "starts with \`\[$role\]\`" "$dir/$role-workflow.md" 2>/dev/null \
+      || { echo "::error::$role-workflow.md does not require the [$role] marker on a verdict comment — the queue cannot tell you have looked" >&2; rc=1; }
+  done
+
   # SOMEBODY MUST DRIVE THE COMBINATION. Every gate certifies one head against main and every
   # reviewer reads one branch, so two pull requests that interact are verified by nobody. Product is
   # the only role that sees the merged tree, and three reviewers in a row reported the gap unprompted.

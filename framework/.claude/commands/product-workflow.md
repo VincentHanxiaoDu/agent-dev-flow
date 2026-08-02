@@ -85,7 +85,7 @@ openspec archive <change> --yes        # it prompts without --yes
 **Archiving stamps `## Purpose` as `TBD` and asks you to write it. That section is yours** — the
 generated-files gate permits an edit confined to it and refuses every other line.
 
-**On a stack, merge the lower pull request with a MERGE COMMIT, not a squash.** Both branches
+**On ANY stack — OpenSpec or not — merge the lower pull request with a MERGE COMMIT, not a squash.** Both branches
 regenerate the same spec file; squashing replaces the commit the upper one is stacked on, and it
 lands in an add/add conflict that costs a rebase, a moved sha, and a third review of a pull request
 already approved twice. The cost surfaces one pull request later than the choice.
@@ -113,7 +113,17 @@ UAT passed -> merge -> close the Issue
 
 **An Issue carrying open decisions cannot just be closed.** Closing it destroys them. Carry them
 into a new Issue verbatim — with what the build does in each open region — and say on the closure
-where they went.
+where they went. **That carry-forward Issue does not spend your one-new-Issue budget**; it is part
+of closing, not a finding.
+
+**Every verdict comment you post starts with `[product]` on its own first line.** That marker is not
+decoration — it is the only record that you have looked, and `queue.sh` reads it to stop offering you
+work you have already finished. Without it the queue tells the next agent to redo your round.
+
+**UAT'd, criteria unreachable, deliberately NOT closed is a real outcome** — the normal one on a
+project that refuses rather than guesses. Post the criterion-by-criterion table, say which are
+`unreachable` and why, and leave it open. **Then it is no longer work waiting for you**: the queue
+reads your role-marked comment and stops offering it.
 
 ## 8. The release
 
