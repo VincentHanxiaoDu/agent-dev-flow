@@ -49,7 +49,13 @@ run_gate() {
   if [ -n "$bnum" ] && [ -n "${REPO_SLUG:-$(git config --get remote.origin.url 2>/dev/null)}" ]; then
     local slug itype
     slug=${REPO_SLUG:-$(git config --get remote.origin.url | sed -E 's#^(https://[^/]+/|git@[^:]+:)##; s#\.git$##')}
-    itype=$(gh api "repos/$slug/issues/$bnum" --jq '[.labels[].name] | map(select(startswith("type:"))) | .[0] // ""' 2>/dev/null || echo "__unreachable__")
+    # `|| echo __unreachable__` DOES NOT MAKE A FAILED LOOKUP LOOK LIKE ONE. On a 401, a 403 or a
+    # 404, `gh api` writes the error BODY to stdout and then exits non-zero, so the substitution
+    # captured the JSON with `__unreachable__` glued to its end — which matches neither arm below
+    # and refused a perfectly correct branch name, quoting a blob of JSON as the Issue's type. Any
+    # CI token without Issue read access turned every pull request red for a name that was right.
+    # The exit status has to be read on its own, not smuggled through the captured output.
+    if itype=$(gh api "repos/$slug/issues/$bnum" --jq '[.labels[].name] | map(select(startswith("type:"))) | .[0] // ""' 2>/dev/null); then :; else itype=__unreachable__; fi
     case "$itype" in
       __unreachable__|"")
         echo "  note: could not read Issue #$bnum, so the branch's number was NOT verified." ;;
