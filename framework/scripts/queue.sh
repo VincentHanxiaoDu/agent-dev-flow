@@ -59,17 +59,29 @@ resolve_repo() {
 # had headroom, and `gh issue list` returned an EMPTY FILE rather than an error when that happened.
 issues() { resolve_repo; api --paginate "repos/$REPO/issues?state=open&per_page=100"; }
 
-emit() { # emit <heading> <jq-filter> [--unclaimed]
-  local head=$1 filter=$2 skip=${3:-} out
+# EVERY FILTER NAMES WHAT IT DROPPED. The "named, not counted" fix was applied to one filter and
+# not the other three, so on the arm where silent suppression was REPORTED it became more silent
+# than the parenthesis that was filed — no count, no name, no trace. A filter that removes work
+# without saying so is the defect this queue exists to prevent, and it recurred inside its own fix.
+drop() { # drop <heading-var> <numbers> <why>  -> prints what it removed
+  local nums=$2 why=$3 hidden
+  [ -n "$nums" ] || { printf '%s' "$out"; return 0; }
+  hidden=$(printf '%s\n' "$out" | grep -E "^  #($(printf '%s' "$nums" | tr '\n' '|' | sed 's/|$//'))  " || true)
+  out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$nums" | tr '\n' '|' | sed 's/|$//'))  " || true)
+  [ -z "$hidden" ] || DROPPED="$DROPPED
+  ($why)
+$(printf '%s' "$hidden" | sed 's/^  /      /')"
+}
+
+emit() { # emit <heading> <jq-filter> [--unclaimed|--unbuilt|--landed|--unruled]
+  local head=$1 filter=$2 skip=${3:-} out DROPPED=""
   out=$(printf '%s' "$ALL" | jq -r "$filter" 2>/dev/null || true)
   # AN ISSUE SOMEBODY IS ALREADY ON IS NOT WORK TO START. Dropped rather than hidden: the count is
   # printed, because "nothing here" and "three of these are in flight" are different answers.
   # --landed: only Issues whose branch is GONE from the remote, i.e. the work merged and the branch
   # was deleted, or there never was one. An Issue still holding an open branch is somebody else's
   # turn, and showing it here is how a role goes looking for work that does not exist yet.
-  if [ "$skip" = "--landed" ] && [ -n "${VERIFIED:-}" ]; then
-    out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$VERIFIED" | tr '\n' '|' | sed 's/|$//'))  " || true)
-  fi
+  [ "$skip" != "--landed" ] || drop head "${VERIFIED:-}" "you have already recorded a verdict on this"
   if [ "$skip" = "--landed" ]; then
     if [ -n "${OPEN_BRANCH_ISSUES:-}" ]; then
       out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$OPEN_BRANCH_ISSUES" | tr '\n' '|' | sed 's/|$//'))  " || true)
@@ -85,15 +97,14 @@ emit() { # emit <heading> <jq-filter> [--unclaimed]
   # resolve — a dev agent spent a whole round discovering that by hand, which is a round the queue
   # could have saved it.
   # --unruled: drop the ones whose decision has since been answered.
-  if [ "$skip" = "--unruled" ]; then
-    [ -z "${RULED:-}" ] || out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$RULED" | tr '\n' '|' | sed 's/|$//'))  " || true)
-  fi
+  [ "$skip" != "--unruled" ] || drop head "${RULED:-}" "already ruled on — the decision is made"
+
   if [ "$skip" = "--unbuilt" ] && [ -n "${EVER_BUILT:-}" ]; then
     # A RULING MAKES A BUILT ISSUE UNBUILT AGAIN. What shipped answered nothing; the answer has
     # arrived, and the work it implies has not been done.
     local built=$EVER_BUILT
     [ -z "${RULED:-}" ] || built=$(printf '%s\n' "$EVER_BUILT" | grep -vxF -f <(printf '%s\n' "$RULED") || true)
-    [ -z "$built" ] || out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$built" | tr '\n' '|' | sed 's/|$//'))  " || true)
+    drop head "$built" "a pull request has already been opened for this"
   fi
   [ "$skip" = "--unbuilt" ] && skip=--unclaimed
   if [ "$skip" = "--unclaimed" ] && [ -n "${CLAIMED:-}" ]; then
@@ -110,16 +121,13 @@ emit() { # emit <heading> <jq-filter> [--unclaimed]
     # tooling returned rc=0 and a reassuring parenthesis.
     #
     # Naming them costs nothing and makes a wrong claim visible the moment it happens.
-    if [ "$before" -ne "$after" ]; then
-      local hidden
-      hidden=$(printf '%s\n' "$out_before" | grep -E "^  #($(printf '%s' "$CLAIMED" | tr '\n' '|' | sed 's/|$//'))  " | sed 's/^  /      /' || true)
-      head="$head
-  (already has a branch — somebody is on it. If that is wrong, the branch's number is wrong:)
-$hidden"
-    fi
+    [ "$before" -eq "$after" ] || DROPPED="$DROPPED
+  (already has an open pull request — somebody is on it. If that is wrong, its branch names the wrong number:)
+$(printf '%s\n' "$out_before" | grep -E "^  #($(printf '%s' "$CLAIMED" | tr '\n' '|' | sed 's/|$//'))  " | sed 's/^  /      /' || true)"
   fi
   printf '\n%s\n' "$head"
   if [ -n "$out" ]; then printf '%s\n' "$out"; else printf '  (none)\n'; fi
+  [ -z "$DROPPED" ] || printf '%s\n' "$DROPPED"
 }
 
 # YOUR OWN PULL REQUESTS, AND WHICH OF THEM NEED YOU. Without this a role has to call three
@@ -203,8 +211,12 @@ role_queue() {
   VERIFIED=$(api --paginate "repos/$REPO/issues/comments?per_page=100" \
     | jq -r --arg r "[$role]" '.[] | select(.body | startswith($r)) | .issue_url' 2>/dev/null \
     | sed -n 's#.*/issues/##p' | sort -u)
+  # MERGED, NOT MERELY OPENED. `state=all` counted a pull request that was CLOSED without merging,
+  # so an abandoned attempt removed its Issue from dev's queue permanently — deleting the branch did
+  # not help, because the pull request record keeps the ref. An Issue whose only pull request was
+  # abandoned has not been built.
   EVER_BUILT=$(api --paginate "repos/$REPO/pulls?state=all&per_page=100" \
-    | jq -r '.[].head.ref' 2>/dev/null \
+    | jq -r '.[] | select(.merged_at != null) | .head.ref' 2>/dev/null \
     | sed -n 's#^[a-z]*/[a-z]*/\([0-9][0-9]*\)-.*#\1#p' | sort -u)
 
   case "$role" in

@@ -36,6 +36,36 @@ run_gate() {
   case "$branch" in
     main|master|HEAD) echo "  branch: '$branch' is the default branch, so the work-branch pattern does not apply" ;;
     *)
+  # THE ISSUE NUMBER IN A BRANCH NAME IS LOAD-BEARING AND WAS UNCHECKED. queue.sh derives claims
+  # from it, so a branch whose number names an Issue it is not the build for deletes that Issue from
+  # somebody's queue — reported after one agent's branch silently removed another's work. The gate
+  # read the branch's SHAPE and nothing about its meaning.
+  #
+  # Checked when the API can be reached; skipped, saying so, when it cannot — a lookup failure here
+  # must not block a pull request over a name that may be perfectly correct.
+  local bnum btype
+  bnum=$(printf '%s' "$branch" | sed -n 's#^[a-z]*/[a-z]*/\([0-9][0-9]*\)-.*#\1#p')
+  btype=$(printf '%s' "$branch" | sed -n 's#^[a-z]*/\([a-z]*\)/[0-9].*#\1#p')
+  if [ -n "$bnum" ] && [ -n "${REPO_SLUG:-$(git config --get remote.origin.url 2>/dev/null)}" ]; then
+    local slug itype
+    slug=${REPO_SLUG:-$(git config --get remote.origin.url | sed -E 's#^(https://[^/]+/|git@[^:]+:)##; s#\.git$##')}
+    itype=$(gh api "repos/$slug/issues/$bnum" --jq '[.labels[].name] | map(select(startswith("type:"))) | .[0] // ""' 2>/dev/null || echo "__unreachable__")
+    case "$itype" in
+      __unreachable__|"")
+        echo "  note: could not read Issue #$bnum, so the branch's number was NOT verified." ;;
+      *)
+        # feat/spec build features; everything else is bug or chore work.
+        case "$itype/$btype" in
+          type:feature/feat|type:feature/spec|type:bug/fix|type:bug/feat|type:chore/chore|type:chore/docs|type:chore/ci|type:chore/build|type:chore/test|type:chore/refactor|type:chore/perf|type:bug/chore) : ;;
+          *)
+            echo "::error::branch '$branch' says '$btype' but Issue #$bnum is '$itype'." >&2
+            echo "  The number in a branch name is what the queue derives a claim from — a wrong one" >&2
+            echo "  removes somebody else's Issue from their queue with no trace." >&2
+            rc=1 ;;
+        esac ;;
+    esac
+  fi
+
   # <role>/<type>/<issue>-<slug>
   if ! printf '%s' "$branch" | grep -qE "^(dev|qa|product|ops|flow)/($TYPES)/[0-9]+-[a-z0-9-]+$"; then
     echo "::error::branch '$branch' is not <role>/<type>/<issue>-<slug>" >&2
