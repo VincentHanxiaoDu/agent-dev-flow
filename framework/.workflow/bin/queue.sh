@@ -250,11 +250,15 @@ role_queue() {
       emit "OPEN PULL REQUESTS — CI and gate health:" \
         '.[] | select(.pull_request!=null) | "  #\(.number)  \(.title)"' ;;
     pm)
-      # AN ISSUE WAITING ON A DECISION IS IN NOBODY'S QUEUE, AND THAT IS CORRECT — nobody can build
-      # it. But correct and invisible is an orphan: two Issues sat open, verified, deliberately left
-      # open for the owner, and every role's queue dropped them for a good reason. Work nobody can
-      # do is still work somebody must SEE, and the pm is the only channel to whoever decides.
-      emit "WAITING ON A DECISION — nobody can build these; the owner must answer:" \
+      # DECISIONS THE OWNER OWES — NOT WORK NOBODY CAN DO. The first version said "nobody can build
+      # these", which contradicted dev's own instruction: an Issue carrying an open decision IS
+      # dev's to build, as far as its criteria settle, with the undecided path refusing loudly. The
+      # same Issue then appeared in dev's "resolve these" and pm's "nobody can build these" at once.
+      #
+      # What is true is narrower and still worth a section: these carry a question only the owner
+      # can answer, and the pm is the only channel to them. Some will also be in dev's queue, and
+      # that is not a contradiction — part of the work is buildable and part of it is not.
+      emit "DECISIONS THE OWNER OWES — the work proceeds around them, refusing where they bite:" \
         '.[] | select(.pull_request==null)
              | select(.body // "" | test("## Blocked on a decision"))
              | "  #\(.number)  \(.title)"' --unruled
