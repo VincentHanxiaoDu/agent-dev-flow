@@ -12,6 +12,7 @@
 #   CHANGES   #12  <title>                       a reviewer asked for changes
 #   READY     #12  <title>                       green and mergeable
 #   MERGED    #12  <title>                       it landed
+#   NEEDS-REVIEW #12 <title>                    somebody else built it and it is waiting on a verdict
 #   LOOKUP FAILED: <reason>                      the poll could not be answered
 #
 # **Every terminal state emits, not only the good one.** A watch that reported only READY would be
@@ -57,7 +58,7 @@ self_test() {
   # documentation exists.
   local s code
   code=$(grep -v '^[[:space:]]*#' "${BASH_SOURCE[0]}")
-  for s in FAILING CHANGES READY MERGED; do
+  for s in FAILING CHANGES READY MERGED NEEDS-REVIEW; do
     printf '%s' "$code" | grep -q "emit $s " \
       || { echo "SELF-TEST FAIL: state '$s' is never emitted — an agent would not learn about it" >&2; rc=1; }
   done
@@ -105,8 +106,23 @@ while true; do
 
   while IFS=$'\t' read -r num title branch sha; do
     [ -n "$num" ] || continue
-    # Only this role's branches. `flow/**` belongs to whoever is changing the process itself.
-    case "$branch" in "$role"/*) : ;; *) continue ;; esac
+    # A PULL REQUEST THIS ROLE DID NOT WRITE IS A REVIEW WAITING TO HAPPEN. Review was the one step
+    # nothing woke anybody for: a human had to notice a pull request existed and start an agent.
+    # That is the coordinator this process removes, surviving in the one place it mattered most.
+    #
+    # Independence is derived from the `Agent:` trailers, which is what the gate reads — so the
+    # event only ever goes to somebody the gate would accept.
+    case "$branch" in
+      "$role"/*) : ;;
+      *)
+        authors=$(git log --format=%B "origin/main..origin/$branch" 2>/dev/null | sed -n 's/^Agent:[[:space:]]*//p' | sort -u)
+        if [ -n "$authors" ] && ! printf '%s\n' "$authors" | grep -qi "^$role"; then
+          # Only when it is actually waiting on one.
+          rst=$(gh api "repos/$REPO/commits/$sha/status" --jq '[.statuses[]?|select(.context|test("Reviewed by an agent"))][0].state // ""' 2>/dev/null || echo "")
+          [ "$rst" = success ] || emit NEEDS-REVIEW "$num" "$title" "[$branch] built by ${authors//$'\n'/, } — run /review-pr $num"
+        fi
+        continue ;;
+    esac
 
     # Check runs on the head sha. A failure here is itself a lookup failure, not a green.
     if ! runs=$(gh api "repos/$REPO/commits/$sha/check-runs" 2>&1); then

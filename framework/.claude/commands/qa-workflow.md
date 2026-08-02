@@ -37,6 +37,10 @@ That second one is why a red gate reaches you. It emits **`FAILING`, `CHANGES`, 
 alone would be silent through the failure it exists to catch, and silence is indistinguishable from
 still-running.
 
+**A `NEEDS-REVIEW` event is also work, and it is not yours to skip.** You authored none of those
+commits, so you are exactly who the gate will accept — run **`/review-pr <n>`** and follow it. A pull
+request nobody reviews is a pull request nobody merges.
+
 **A `FAILING` or `CHANGES` event is work.** Fix it on the branch it came from; do not wait for
 someone to tell you twice.
 

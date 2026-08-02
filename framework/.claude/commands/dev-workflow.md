@@ -19,6 +19,10 @@ Monitor(command: "./scripts/watch-prs.sh dev 60",   description: "your PRs", per
 
 **A failed lookup is not an empty queue** — if `queue.sh` exits non-zero you have **not learned that you have no work**. Retry or report; never proceed as though it were empty.
 
+**A `NEEDS-REVIEW` event is also work, and it is not yours to skip.** You authored none of those
+commits, so you are exactly who the gate will accept — run **`/review-pr <n>`** and follow it. A pull
+request nobody reviews is a pull request nobody merges.
+
 **A `FAILING` or `CHANGES` event is work.** `./scripts/pr.sh state <n>` is the whole picture — a
 pull request can be red for more than one reason at once.
 
