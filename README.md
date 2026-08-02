@@ -153,5 +153,18 @@ Your queue is one command:
 **If it exits non-zero you have not learned that you have no work.** Retry or report; never proceed as
 though it were empty.
 
+Your board — every open pull request, and which of them are waiting on you — is one more:
+
+```bash
+./.workflow/bin/watch-prs.sh <role> --sweep
+```
+
+Your prompt will also have you start `./.workflow/bin/watch-queue.sh` and `./.workflow/bin/watch-prs.sh`
+as monitors, so new work wakes you instead of waiting to be asked. **Those are an optimisation and
+never your only route to your work.** A monitor is a process, processes end, and a dead one is
+indistinguishable from a quiet queue — so both watches emit `WATCHING` while alive and `WATCH DIED`
+when they stop. **If the heartbeat stops arriving, restart the watch and sweep.** A round is over
+when a sweep comes back empty, not when nothing woke you.
+
 `PRD.md` in this repository states what the process is for and every requirement it holds itself to,
 each one traced to a measured failure of the build before it.

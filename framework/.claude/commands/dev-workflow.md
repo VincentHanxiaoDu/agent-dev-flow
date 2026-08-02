@@ -19,6 +19,35 @@ Monitor(command: "./.workflow/bin/watch-prs.sh dev 60",   description: "your PRs
 
 **A failed lookup is not an empty queue** — if `queue.sh` exits non-zero you have **not learned that you have no work**. Retry or report; never proceed as though it were empty.
 
+### A watch can die, and a dead watch looks exactly like a quiet queue
+
+**Being woken is an optimisation. It is never how you find out what is waiting on you.** A monitor is
+a process, processes end, and the one thing a dead process cannot do is tell you it is dead. This has
+happened: a watcher died three times in one session, and the role it served sat idle believing its
+board was clear while pull requests piled up behind it.
+
+So the watches now tell you they are alive, and you are responsible for noticing when they stop:
+
+- **`WATCHING ...`** arrives on the first poll and every tenth after it. It is not noise. It is the
+  only evidence you have that the watch is still standing.
+- **`WATCH DIED (exit n)`** says so outright — restart it.
+- **If no `WATCHING` line has arrived in ~15 minutes, assume it is dead** even without that message.
+  Restart it, then sweep. Do not reason from silence.
+
+**The sweep answers the question from scratch, depending on no monitor at all:**
+
+```bash
+./.workflow/bin/watch-prs.sh dev --sweep
+```
+
+One pass over every open pull request, then it exits. It emits the same events the monitor does —
+`FAILING`, `CHANGES`, `NEEDS-REVIEW`, `READY`, `ISSUE-MOVED` — because it is the same code, and a
+fallback that drifts from the thing it backs up is worse than none.
+
+**Run it at the start of every round, and again before you conclude you have finished.** A round is
+not over because nothing woke you; it is over when a sweep comes back with nothing in it. **And a
+sweep that fails exits non-zero — that is an outage, not an empty board.**
+
 **An `ISSUE-MOVED` event means the ground shifted while you were building.** Re-read the Issue and
 say on the pull request what changed and what you did about it — **a stale build and a wrong build
 look identical in a diff**, and only you can tell a reviewer which this is.
