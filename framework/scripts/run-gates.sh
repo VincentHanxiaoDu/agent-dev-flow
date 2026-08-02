@@ -24,7 +24,10 @@ here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # exclusion look identical from a green run, so the exclusion is data rather than an absence — and
 # the self-test below requires that anything excluded is also disclosed in the closing message.
 # Found by this file's own self-test, which failed the first time it was run.
-CANNOT_RUN_LOCALLY="check-review.sh"   # needs the PR's comments; only CI has them
+#   check-review.sh     needs the PR's comments; only CI has them
+#   check-no-orphans.sh answers about the BOARD, not about this diff — a role runs it when it wants
+#                       to know whether anything has fallen out of every queue, not before a push
+CANNOT_RUN_LOCALLY="check-review.sh check-no-orphans.sh"
 
 self_test() {
   local rc=0 g b
@@ -45,8 +48,10 @@ self_test() {
       *" $b "*)
         # Excluded — but the closing message must SAY it is excluded, or a reader takes the pass
         # as covering it.
-        grep -q "review gate" "${BASH_SOURCE[0]}" \
-          || { echo "SELF-TEST FAIL: $b is excluded and the runner's output does not disclose it" >&2; rc=1; }
+        # THE EXCLUSION MUST BE DISCLOSED WITH ITS REASON, not merely listed. A reader who cannot
+        # see why takes the pass as covering it.
+        grep -q "^#   $b" "${BASH_SOURCE[0]}" \
+          || { echo "SELF-TEST FAIL: $b is excluded and no reason is recorded" >&2; rc=1; }
         continue ;;
     esac
     grep -q "$b" "${BASH_SOURCE[0]}" \
