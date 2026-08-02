@@ -127,6 +127,13 @@ work you have already finished. Without it the queue tells the next agent to red
 **After merging, read the Issue back.** A closing keyword anywhere in the pull request closes it for
 you, against whatever you decided — and a green merge and a correct merge look identical.
 
+**The merge is not finished until main is green.** Your `MERGED` event carries main's colour, because
+you are the one who changed it. Two pull requests that were each green against an older main can be
+red together — nothing tested them merged, and gates run on branches. **If it says `MAIN IS RED`,
+that is your work, now, before you merge anything else**: whoever branches next inherits it and will
+read it as their own breakage, which is a diagnosis nobody can reach from the failure they see. If it
+says `UNKNOWN`, main's colour was not read — go and look, and do not merge again until you have.
+
 **UAT'd, criteria unreachable, deliberately NOT closed is a real outcome** — the normal one on a
 project that refuses rather than guesses. Post the criterion-by-criterion table, say which are
 `unreachable` and why, and leave it open. **Then it is no longer work waiting for you**: the queue
