@@ -65,7 +65,11 @@ issues() { resolve_repo; api --paginate "repos/$REPO/issues?state=open&per_page=
 # without saying so is the defect this queue exists to prevent, and it recurred inside its own fix.
 drop() { # drop <heading-var> <numbers> <why>  -> prints what it removed
   local nums=$2 why=$3 hidden
-  [ -n "$nums" ] || { printf '%s' "$out"; return 0; }
+  # NOTHING TO DROP IS A NO-OP, NOT A PRINT. This said `printf '%s' "$out"` — a leftover from a
+  # version where this function returned the list — so on every queue with nothing filtered it
+  # printed the whole list to stdout ABOVE the heading. The lines then read as the role's work when
+  # they were the opposite, and two agents filed it before I saw it.
+  [ -n "$nums" ] || return 0
   hidden=$(printf '%s\n' "$out" | grep -E "^  #($(printf '%s' "$nums" | tr '\n' '|' | sed 's/|$//'))  " || true)
   out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$nums" | tr '\n' '|' | sed 's/|$//'))  " || true)
   [ -z "$hidden" ] || DROPPED="$DROPPED
@@ -83,15 +87,14 @@ emit() { # emit <heading> <jq-filter> [--unclaimed|--unbuilt|--landed|--unruled]
   # turn, and showing it here is how a role goes looking for work that does not exist yet.
   [ "$skip" != "--landed" ] || drop head "${VERIFIED:-}" "you have already recorded a verdict on this"
   if [ "$skip" = "--landed" ]; then
-    if [ -n "${OPEN_BRANCH_ISSUES:-}" ]; then
-      out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$OPEN_BRANCH_ISSUES" | tr '\n' '|' | sed 's/|$//'))  " || true)
-    fi
-    # And an Issue nobody has ever built is not landed either.
-    if [ -n "${EVER_BUILT:-}" ]; then
-      out=$(printf '%s\n' "$out" | grep -E "^  #($(printf '%s' "$EVER_BUILT" | tr '\n' '|' | sed 's/|$//'))  " || true)
-    else
-      out=""
-    fi
+    drop head "${OPEN_BRANCH_ISSUES:-}" "still has an open pull request — somebody else's turn"
+    # AND AN ISSUE NOBODY HAS EVER BUILT IS NOT LANDED EITHER. Named too: "nothing here" and "four
+    # of these have not been built yet" are different answers, and the second is the common one on
+    # a new board.
+    local notbuilt
+    notbuilt=$(printf '%s\n' "$out" | sed -n 's/^  #\([0-9][0-9]*\) .*/\1/p')
+    [ -z "${EVER_BUILT:-}" ] || notbuilt=$(printf '%s\n' "$notbuilt" | grep -vxF -f <(printf '%s\n' "$EVER_BUILT") || true)
+    drop head "$notbuilt" "not built yet — dev has not opened a pull request for it"
   fi
   # --unbuilt: unclaimed AND never built. An Issue whose work already merged is not dev's to
   # resolve — a dev agent spent a whole round discovering that by hand, which is a round the queue
