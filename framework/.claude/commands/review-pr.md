@@ -25,7 +25,7 @@ That is the whole of it. Restating what CI proved is not a check, it is a delay.
 REPO=$(git config --get remote.origin.url | sed -E 's#^(https://[^/]+/|git@[^:]+:)##; s#\.git$##')
 gh api "repos/$REPO/pulls/<n>"                     # body, head sha, branch — the Issue is in `Refs #N`
 gh api "repos/$REPO/issues/<n>/comments"           # prior reviews and the author's replies
-./scripts/pr.sh state <n>                          # every check AND every status, with the verdict
+./.workflow/bin/pr.sh state <n>                          # every check AND every status, with the verdict
 ```
 
 **Establish your own independence before anything else** — the gate will refuse you, but finding

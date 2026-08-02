@@ -47,11 +47,17 @@ trap cleanup EXIT
 [ -d "$SRC" ] || { echo "error: no framework/ directory found at $SRC" >&2; exit 1; }
 [ "$target" != "$(dirname "$SRC")" ] || { echo "error: refusing to install the framework into itself" >&2; exit 1; }
 
+# THE FRAMEWORK'S SCRIPTS LIVE UNDER `.workflow/bin/`, NOT IN A TOP-LEVEL `scripts/`. A project with
+# its own `scripts/` had a same-named file silently replaced — measured: a project's `queue.sh` was
+# overwritten by the framework's, and `scripts/` is one of the most common directory names there is.
+# `.workflow/` now holds both halves with the seam between them: `bin/` is the framework's and is
+# replaced, `<role>/AGENT.md` is the project's and is never touched.
+#
 # .github IS IN THE MANIFEST, and it was not. The workflow that produces every required context
 # was therefore never installed: the gates existed as scripts nothing ran, and the install then
 # refused to print a context list because it could not find the file it had not copied. The refusal
 # was right and it is how this was found.
-manifest() { ( cd "$SRC" && find .claude .github scripts -type f | sed 's#^\./##' ); }
+manifest() { ( cd "$SRC" && find .claude .github .workflow/bin -type f | sed 's#^\./##' ); }
 
 # --- what would change -------------------------------------------------------
 declare -a overwrites=() news=()
@@ -72,7 +78,7 @@ while IFS= read -r f; do
   mkdir -p "$target/$(dirname "$f")"
   cp "$SRC/$f" "$target/$f"
 done < <(manifest)
-chmod +x "$target"/scripts/*.sh
+chmod +x "$target"/.workflow/bin/*.sh
 
 # --- the project's own half, created once and then left alone ----------------
 for role in dev qa product ops reviewer; do
@@ -184,11 +190,11 @@ fi
 
 # --- verify, rather than assume the copy was faithful ------------------------
 echo
-( cd "$target" && ./scripts/check-prompts.sh ) || {
+( cd "$target" && ./.workflow/bin/check-prompts.sh ) || {
   echo "error: the installed commands do not satisfy the design. Files were written; a working" >&2
   echo "       process was not delivered. Fix the framework and re-run." >&2
   exit 1; }
-( cd "$target" && ./scripts/queue.sh --self-test >/dev/null ) || {
+( cd "$target" && ./.workflow/bin/queue.sh --self-test >/dev/null ) || {
   echo "error: queue.sh's self-test fails here. Refusing to report a successful install." >&2; exit 1; }
 
 # READ FROM THE WORKFLOW'S OWN DECLARATION, not from its job names. Job names were the first
@@ -281,10 +287,11 @@ not by messaging each other — so they can all run at once.
 
 COMMIT ONLY WHAT CI RUNS:
 
-    git add .github scripts .workflow && git commit -m "chore: install agent-dev-flow" && git push
+    git add .github .workflow && git commit -m "chore: install agent-dev-flow" && git push
 
-  .github/ and scripts/  CI runs them from the repository, so they must be committed.
-  .workflow/             yours; commit it if your team should share it, ignore it if not.
+  .github/ and .workflow/bin/   CI runs them from the repository, so they must be committed.
+                                bin/ is the framework's half and is replaced every install.
+  .workflow/<role>/AGENT.md     yours. Created once and never overwritten.
   .claude/commands/      gitignored by default — read by your Claude Code session and by no job.
                          Re-running the installer re-creates it on any machine.
 

@@ -9,12 +9,12 @@ You are the **dev agent**. Focus: $ARGUMENTS
 ## 1. Your queue, and keep watching it
 
 ```bash
-./scripts/queue.sh dev
+./.workflow/bin/queue.sh dev
 ```
 
 ```
-Monitor(command: "./scripts/watch-queue.sh dev 60", description: "new Issues", persistent: true)
-Monitor(command: "./scripts/watch-prs.sh dev 60",   description: "your PRs", persistent: true)
+Monitor(command: "./.workflow/bin/watch-queue.sh dev 60", description: "new Issues", persistent: true)
+Monitor(command: "./.workflow/bin/watch-prs.sh dev 60",   description: "your PRs", persistent: true)
 ```
 
 **A failed lookup is not an empty queue** — if `queue.sh` exits non-zero you have **not learned that you have no work**. Retry or report; never proceed as though it were empty.
@@ -23,7 +23,7 @@ Monitor(command: "./scripts/watch-prs.sh dev 60",   description: "your PRs", per
 commits, so you are exactly who the gate will accept — run **`/review-pr <n>`** and follow it. A pull
 request nobody reviews is a pull request nobody merges.
 
-**A `FAILING` or `CHANGES` event is work.** `./scripts/pr.sh state <n>` is the whole picture — a
+**A `FAILING` or `CHANGES` event is work.** `./.workflow/bin/pr.sh state <n>` is the whole picture — a
 pull request can be red for more than one reason at once.
 
 ## 2. Work all of it in parallel
@@ -86,7 +86,7 @@ pretending it belongs to whichever Issue came first is not.
   trimmed and the remainder filed.
 
 **A fix that must survive an upgrade goes in a project-owned file.** `.claude/`, `.github/` and
-`scripts/` belong to the installer and are replaced wholesale on every refresh — twice in one round,
+`.workflow/bin/` belong to the installer and are replaced wholesale on every refresh — twice in one round,
 mid-flight, while branches were open. Put it in your own files and have the framework's gate read it.
 
 **On an OpenSpec project** every Issue gets a change directory. `Tasks complete` fails on one
@@ -110,7 +110,7 @@ UAT. No `openspec/` directory means the gate says NOT APPLICABLE; do not create 
 ## 4. Before you hand off
 
 ```bash
-./scripts/run-gates.sh          # do not assemble the invocation from memory
+./.workflow/bin/run-gates.sh          # do not assemble the invocation from memory
 ```
 
 It prints what CI prints for the framework's gates, and says what it does not cover. **Green here is
@@ -124,13 +124,13 @@ will go green here and red there on one tree. Pin it.
 asks somebody else to verify something you have said is not done.
 
 ```bash
-./scripts/pr.sh open <branch> "<title>" <body-file>
-./scripts/pr.sh arm  <number>       # reads back — the CLI exits 0 while refusing
-./scripts/pr.sh state <number>      # every check AND every status, with the verdict
+./.workflow/bin/pr.sh open <branch> "<title>" <body-file>
+./.workflow/bin/pr.sh arm  <number>       # reads back — the CLI exits 0 while refusing
+./.workflow/bin/pr.sh state <number>      # every check AND every status, with the verdict
 ```
 
 **A commit-shape failure is an amend and a `--force-with-lease`, not a new commit — and a
-force-push invalidates the review.** You cannot fix that yourself: `./scripts/pr.sh rereview <n>`.
+force-push invalidates the review.** You cannot fix that yourself: `./.workflow/bin/pr.sh rereview <n>`.
 
 ## 5. Not yours
 

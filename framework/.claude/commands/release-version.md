@@ -13,7 +13,7 @@ and say so.**
 ## 1. Check the ground
 
 ```bash
-./scripts/queue.sh ops
+./.workflow/bin/queue.sh ops
 git fetch origin && git log origin/main --oneline | head
 ```
 

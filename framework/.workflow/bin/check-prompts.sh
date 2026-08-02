@@ -143,16 +143,16 @@ run_check() {
   grep -qi 'in a test as well as in the code\|settled.*in a test' "$dir/review-pr.md" 2>/dev/null \
     || { echo "::error::review-pr.md does not say a test can settle an open decision the body claims is open" >&2; rc=1; }
 
-  # A COMMAND MUST NOT NAME A SCRIPT THAT DOES NOT EXIST. A prompt referenced `./scripts/my-queue.sh`
+  # A COMMAND MUST NOT NAME A SCRIPT THAT DOES NOT EXIST. A prompt referenced `./.workflow/bin/my-queue.sh`
   # four times — a name from a previous build — and every instruction using it was uncopyable. The
   # scripts are right here; checking is one loop.
   local ref
   for f in "$dir"/*.md; do
     while IFS= read -r ref; do
       [ -n "$ref" ] || continue
-      [ -f "$dir/../../scripts/$ref" ] || [ -f "$(dirname "${BASH_SOURCE[0]}")/$ref" ] \
-        || { echo "::error::$(basename "$f") calls ./scripts/$ref, which does not exist" >&2; rc=1; }
-    done < <(grep -oE '\./scripts/[a-z-]+\.sh' "$f" | sed 's#\./scripts/##' | sort -u)
+      [ -f "$dir/../../.workflow/bin/$ref" ] || [ -f "$(dirname "${BASH_SOURCE[0]}")/$ref" ] \
+        || { echo "::error::$(basename "$f") calls ./.workflow/bin/$ref, which does not exist" >&2; rc=1; }
+    done < <(grep -oE '\./.workflow/bin/[a-z-]+\.sh' "$f" | sed 's#\./.workflow/bin/##' | sort -u)
   done
 
   # EVERY COMMAND CARRIES ITS PROJECT INJECTION POINT. Without it a project cannot add its own

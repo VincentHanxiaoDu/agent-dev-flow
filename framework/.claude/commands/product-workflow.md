@@ -11,7 +11,7 @@ You are the **product agent**. Focus: $ARGUMENTS
 ## 1. Your queue
 
 ```bash
-./scripts/queue.sh product
+./.workflow/bin/queue.sh product
 ```
 
 **A failed lookup is not an empty queue** — if that exits non-zero you have **not learned that you have no work**.
@@ -21,7 +21,7 @@ You are the **product agent**. Focus: $ARGUMENTS
 Start a monitor so new work wakes you instead of waiting to be asked:
 
 ```
-Monitor(command: "./scripts/watch-queue.sh product 60", description: "features to UAT", persistent: true)
+Monitor(command: "./.workflow/bin/watch-queue.sh product 60", description: "features to UAT", persistent: true)
 ```
 
 It emits `NEW #<n> <title>` when work appears, and **`LOOKUP FAILED: <reason>` when a poll cannot be
@@ -29,7 +29,7 @@ answered** — because an expired token and a quiet queue look identical otherwi
 cannot tell them apart sits idle believing it is finished.
 
 ```
-Monitor(command: "./scripts/watch-prs.sh product 60", description: "product PRs going red or needing changes", persistent: true)
+Monitor(command: "./.workflow/bin/watch-prs.sh product 60", description: "product PRs going red or needing changes", persistent: true)
 ```
 
 That second one is why a red gate reaches you. It emits **`FAILING`, `CHANGES`, `READY` and

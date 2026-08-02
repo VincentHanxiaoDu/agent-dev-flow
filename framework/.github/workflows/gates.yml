@@ -81,15 +81,15 @@ jobs:
           # command files, which are a LOCAL concern — the installer verifies them once, in the
           # target, and nothing about a pull request can change them. Requiring them here would
           # force a project to commit `.claude/` for a check that says nothing about its code.
-          for s in ./scripts/check-naming.sh ./scripts/check-tasks-complete.sh \
-                   ./scripts/check-generated.sh ./scripts/check-review.sh; do
+          for s in ./.workflow/bin/check-naming.sh ./.workflow/bin/check-tasks-complete.sh \
+                   ./.workflow/bin/check-generated.sh ./.workflow/bin/check-review.sh; do
             [ -f "$s" ] || { echo "::error::$s is missing — the gates cannot run"; exit 1; }
             bash "$s" --self-test >/dev/null || { echo "::error::$s cannot be shown to fail"; exit 1; }
           done
           echo "every gate's self-test passes"
 
       - name: Branch name and commit convention
-        run: ./scripts/check-naming.sh "${{ github.head_ref || github.ref_name }}" "${{ github.event.pull_request.base.sha || github.event.before }}"
+        run: ./.workflow/bin/check-naming.sh "${{ github.head_ref || github.ref_name }}" "${{ github.event.pull_request.base.sha || github.event.before }}"
 
   tasks:
     name: Tasks complete
@@ -102,7 +102,7 @@ jobs:
       # PASSES ON A PROJECT THAT DOES NOT USE OPENSPEC, and says so. A gate that blocks every pull
       # request in a repository it does not apply to is worse than no gate: nothing merges, and the
       # reason is invisible until someone reads a log.
-      - run: ./scripts/check-tasks-complete.sh "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - run: ./.workflow/bin/check-tasks-complete.sh "${{ github.event.pull_request.base.sha || github.event.before }}"
 
   generated:
     name: Generated files not hand-authored
@@ -112,7 +112,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with: { ref: "${{ github.event.pull_request.head.sha || github.sha }}", fetch-depth: 0 }
-      - run: ./scripts/check-generated.sh "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - run: ./.workflow/bin/check-generated.sh "${{ github.event.pull_request.base.sha || github.event.before }}"
 
   build:
     name: Build and tests
@@ -184,7 +184,7 @@ jobs:
 
       - name: Self-test the checker
         id: selftest
-        run: ./scripts/check-review.sh --self-test
+        run: ./.workflow/bin/check-review.sh --self-test
 
       - name: Require a review of this head sha
         # `continue-on-error` KEEPS THE JOB GREEN WHILE THE STEP'S OUTCOME STAYS READABLE. Without
@@ -205,7 +205,7 @@ jobs:
           # The exit code is RECORDED, because the publishing step needs to tell a refusal (2) from
           # an absence (1) and a step's outcome carries neither.
           set +e
-          ./scripts/check-review.sh "${{ steps.pr.outputs.head_sha }}" comments.json "${{ steps.pr.outputs.base_sha }}"
+          ./.workflow/bin/check-review.sh "${{ steps.pr.outputs.head_sha }}" comments.json "${{ steps.pr.outputs.base_sha }}"
           rc=$?
           set -e
           echo "$rc" > review.rc

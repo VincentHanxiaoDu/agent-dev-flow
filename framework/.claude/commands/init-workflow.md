@@ -37,15 +37,16 @@ a label it could not create, or a policy that read back wrong, say so plainly** 
 ## 3. Commit only what CI runs
 
 ```bash
-git add .github scripts .workflow .gitignore
+git add .github .workflow .gitignore
 git commit -m "chore: install agent-dev-flow
 
 Agent: pm"
 git push
 ```
 
-- **`.github/` and `scripts/`** — GitHub Actions runs these from the repository, so they must be in it.
-- **`.workflow/`** — the project's own instructions. Committed so a teammate gets them.
+- **`.github/` and `.workflow/bin/`** — GitHub Actions runs these from the repository, so they must
+  be in it. `bin/` is the framework's and is replaced on every install.
+- **`.workflow/<role>/AGENT.md`** — the project's own instructions. Created once, never overwritten.
 - **`.claude/commands/`** — deliberately *not* committed; the installer gitignores it. It is read by
   a Claude Code session and by no job, and re-running the installer recreates it anywhere.
 
@@ -57,7 +58,7 @@ git push
 R=$(git config --get remote.origin.url | sed -E 's#^(https://[^/]+/|git@[^:]+:)##; s#\.git$##')
 gh api "repos/$R/labels" --jq '[.[].name] | map(select(startswith("type:") or startswith("area:")))'
 gh api "repos/$R/branches/$(git symbolic-ref --short HEAD)/protection" --jq '.required_status_checks.contexts' 2>/dev/null || echo "NOT PROTECTED"
-./scripts/queue.sh pm
+./.workflow/bin/queue.sh pm
 ```
 
 **Five labels, five contexts, and a queue that answers.** Anything less, report it as a number — not

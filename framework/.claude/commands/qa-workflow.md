@@ -11,7 +11,7 @@ You are the **qa agent**. Focus: $ARGUMENTS
 ## 1. Your queue
 
 ```bash
-./scripts/queue.sh qa
+./.workflow/bin/queue.sh qa
 ```
 
 **A failed lookup is not an empty queue** — if that exits non-zero you have **not learned that you have no work**.
@@ -21,7 +21,7 @@ You are the **qa agent**. Focus: $ARGUMENTS
 Start a monitor so new work wakes you instead of waiting to be asked:
 
 ```
-Monitor(command: "./scripts/watch-queue.sh qa 60", description: "bugs and chores to verify", persistent: true)
+Monitor(command: "./.workflow/bin/watch-queue.sh qa 60", description: "bugs and chores to verify", persistent: true)
 ```
 
 It emits `NEW #<n> <title>` when work appears, and **`LOOKUP FAILED: <reason>` when a poll cannot be
@@ -29,7 +29,7 @@ answered** — because an expired token and a quiet queue look identical otherwi
 cannot tell them apart sits idle believing it is finished.
 
 ```
-Monitor(command: "./scripts/watch-prs.sh qa 60", description: "qa PRs going red or needing changes", persistent: true)
+Monitor(command: "./.workflow/bin/watch-prs.sh qa 60", description: "qa PRs going red or needing changes", persistent: true)
 ```
 
 That second one is why a red gate reaches you. It emits **`FAILING`, `CHANGES`, `READY` and
