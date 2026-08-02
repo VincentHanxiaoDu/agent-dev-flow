@@ -71,6 +71,20 @@ run_gate() {
     # wrong reason is the class this whole project exists to remove, and it was in a gate name.
     #
     # This gate is where an author looks, and it fails with the actual remedy.
+    # A CLOSING KEYWORD TAKES THE CLOSURE AWAY FROM THE ROLE THAT OWNS IT. GitHub acts on
+    # `Closes #N` at merge, so an Issue a verifier had explicitly decided to leave open was closed
+    # anyway — and with it went §7's carry-forward, which guards closing and never ran because
+    # nobody CHOSE to close. Ten open decisions were destroyed and nothing announced it: a green
+    # merge and a correct merge look identical.
+    #
+    # `Refs #N` says what a branch actually does. Closing is qa's act or product's, after verifying.
+    if git log -1 --format=%B "$sha" | grep -qiE '^[[:space:]]*(clos(e|es|ed)|fix(e[sd])?|resolv(e|es|ed))[[:space:]]+#[0-9]'; then
+      echo "::error::$(git rev-parse --short "$sha") carries a closing keyword. GitHub would close that Issue at merge." >&2
+      echo "  Closing belongs to the role that verified the work, after it has verified it — and an" >&2
+      echo "  Issue closed by a merge skips the step that carries its open decisions forward." >&2
+      echo "  Write 'Refs #N' instead." >&2
+      rc=1
+    fi
     if ! git log -1 --format=%B "$sha" | grep -qE '^Agent:[[:space:]]*\S'; then
       echo "::error::$(git rev-parse --short "$sha") has no 'Agent:' trailer." >&2
       echo "  Add a final paragraph 'Agent: <your-role>' — the review gate reads it to work out who" >&2
@@ -142,6 +156,25 @@ Agent: dev-a"
   git -C "$tmp/m" merge -q --no-ff side -m "Merge pull request #4 from owner/dev/feat/2-slug-check"
   ( cd "$tmp/m" && bash "$me" dev/fix/1-ok "$m" ) >/dev/null 2>&1 \
     || { echo "SELF-TEST FAIL: a merge commit was judged by the work-branch rules — every merge would redden the default branch" >&2; rc=1; }
+
+  # 5b. A CLOSING KEYWORD MUST FAIL. It closed two Issues a verifier had explicitly decided to keep
+  #     open, and took their carry-forward step with it.
+  mkdir -p "$tmp/cl"; cl=$(_repo "$tmp/cl")
+  echo c > "$tmp/cl/c"; git -C "$tmp/cl" add -A; git -C "$tmp/cl" commit -qm "feat(x): a thing
+
+Closes #7
+
+Agent: dev-a"
+  ( cd "$tmp/cl" && bash "$me" dev/feat/7-thing "$cl" ) >/dev/null 2>&1 \
+    && { echo "SELF-TEST FAIL: a closing keyword PASSED — a merge would close an Issue nobody chose to close" >&2; rc=1; }
+  # And `Refs #N` must pass, or the arm above forbids referring to an Issue at all.
+  git -C "$tmp/cl" commit -q --amend -m "feat(x): a thing
+
+Refs #7
+
+Agent: dev-a"
+  ( cd "$tmp/cl" && bash "$me" dev/feat/7-thing "$cl" ) >/dev/null 2>&1 \
+    || { echo "SELF-TEST FAIL: 'Refs #N' was rejected" >&2; rc=1; }
 
   # 6. A COMMIT WITH NO Agent: TRAILER MUST FAIL HERE, not three gates later as somebody else's
   #    independence problem.

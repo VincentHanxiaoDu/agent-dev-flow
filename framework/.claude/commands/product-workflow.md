@@ -120,6 +120,9 @@ of closing, not a finding.
 decoration — it is the only record that you have looked, and `queue.sh` reads it to stop offering you
 work you have already finished. Without it the queue tells the next agent to redo your round.
 
+**After merging, read the Issue back.** A closing keyword anywhere in the pull request closes it for
+you, against whatever you decided — and a green merge and a correct merge look identical.
+
 **UAT'd, criteria unreachable, deliberately NOT closed is a real outcome** — the normal one on a
 project that refuses rather than guesses. Post the criterion-by-criterion table, say which are
 `unreachable` and why, and leave it open. **Then it is no longer work waiting for you**: the queue
