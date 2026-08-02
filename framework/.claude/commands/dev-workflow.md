@@ -19,6 +19,10 @@ Monitor(command: "./.workflow/bin/watch-prs.sh dev 60",   description: "your PRs
 
 **A failed lookup is not an empty queue** — if `queue.sh` exits non-zero you have **not learned that you have no work**. Retry or report; never proceed as though it were empty.
 
+**An `ISSUE-MOVED` event means the ground shifted while you were building.** Re-read the Issue and
+say on the pull request what changed and what you did about it — **a stale build and a wrong build
+look identical in a diff**, and only you can tell a reviewer which this is.
+
 **A `NEEDS-REVIEW` event is also work, and it is not yours to skip.** You authored none of those
 commits, so you are exactly who the gate will accept — run **`/review-pr <n>`** and follow it. A pull
 request nobody reviews is a pull request nobody merges.
@@ -122,6 +126,10 @@ will go green here and red there on one tree. Pin it.
 
 **Unticked tasks are not "ready for QA".** Open boxes say the work is unfinished, and handing it on
 asks somebody else to verify something you have said is not done.
+
+**Re-read the Issue immediately before you open the pull request.** You read it when you started;
+a ruling may have landed since, and a pull request built to a superseded reading costs a review
+round and somebody's afternoon.
 
 ```bash
 ./.workflow/bin/pr.sh open <branch> "<title>" <body-file>
