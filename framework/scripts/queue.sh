@@ -84,8 +84,16 @@ emit() { # emit <heading> <jq-filter> [--unclaimed]
   # --unbuilt: unclaimed AND never built. An Issue whose work already merged is not dev's to
   # resolve — a dev agent spent a whole round discovering that by hand, which is a round the queue
   # could have saved it.
+  # --unruled: drop the ones whose decision has since been answered.
+  if [ "$skip" = "--unruled" ]; then
+    [ -z "${RULED:-}" ] || out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$RULED" | tr '\n' '|' | sed 's/|$//'))  " || true)
+  fi
   if [ "$skip" = "--unbuilt" ] && [ -n "${EVER_BUILT:-}" ]; then
-    out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$EVER_BUILT" | tr '\n' '|' | sed 's/|$//'))  " || true)
+    # A RULING MAKES A BUILT ISSUE UNBUILT AGAIN. What shipped answered nothing; the answer has
+    # arrived, and the work it implies has not been done.
+    local built=$EVER_BUILT
+    [ -z "${RULED:-}" ] || built=$(printf '%s\n' "$EVER_BUILT" | grep -vxF -f <(printf '%s\n' "$RULED") || true)
+    [ -z "$built" ] || out=$(printf '%s\n' "$out" | grep -vE "^  #($(printf '%s' "$built" | tr '\n' '|' | sed 's/|$//'))  " || true)
   fi
   [ "$skip" = "--unbuilt" ] && skip=--unclaimed
   if [ "$skip" = "--unclaimed" ] && [ -n "${CLAIMED:-}" ]; then
@@ -184,6 +192,14 @@ role_queue() {
   # open or merged: the ones whose work exists at all.
   OPEN_BRANCH_ISSUES=$CLAIMED
   # Issues already carrying this role's own verdict comment.
+  # AN ANSWERED DECISION IS NOT A WAITING ONE, AND THE ANSWER ARRIVES AS A COMMENT. The `##
+  # Blocked on a decision` section stays in the body forever — it is the record of what was asked —
+  # so a ruling posted underneath left the Issue sitting in "waiting on a decision" with the
+  # decision made. And the ruling means the build is now INCOMPLETE against it, so the Issue goes
+  # back to dev even though it has been built once.
+  RULED=$(api --paginate "repos/$REPO/issues/comments?per_page=100" \
+    | jq -r '.[] | select(.body | startswith("**[owner-ruling]") or startswith("[owner-ruling]")) | .issue_url' 2>/dev/null \
+    | sed -n 's#.*/issues/##p' | sort -u)
   VERIFIED=$(api --paginate "repos/$REPO/issues/comments?per_page=100" \
     | jq -r --arg r "[$role]" '.[] | select(.body | startswith($r)) | .issue_url' 2>/dev/null \
     | sed -n 's#.*/issues/##p' | sort -u)
@@ -226,7 +242,7 @@ role_queue() {
       emit "WAITING ON A DECISION — nobody can build these; the owner must answer:" \
         '.[] | select(.pull_request==null)
              | select(.body // "" | test("## Blocked on a decision"))
-             | "  #\(.number)  \(.title)"'
+             | "  #\(.number)  \(.title)"' --unruled
       emit "UNTYPED — cannot be routed until they carry a type: label:" \
         '.[] | select(.pull_request==null)
              | select([.labels[].name] | any(startswith("type:")) | not)

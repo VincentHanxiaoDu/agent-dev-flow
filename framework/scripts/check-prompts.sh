@@ -114,6 +114,18 @@ run_check() {
       || { echo "::error::$role-workflow.md does not require the [$role] marker on a verdict comment — the queue cannot tell you have looked" >&2; rc=1; }
   done
 
+  # NO PROMPT MAY TEACH A CLOSING KEYWORD. The naming gate refuses one on every commit, because a
+  # merge that closes an Issue skips the step that carries its open decisions forward — and a prompt
+  # still telling a reviewer to look for `Closes #N` survived that fix by one round.
+  # A LINE THAT FORBIDS THE KEYWORD MUST CONTAIN IT. The first version flagged dev-workflow's own
+  # "`Refs #N`, never `Closes #N`" — a check that cannot tell teaching from forbidding will delete
+  # the warning and keep the defect.
+  for f in "$dir"/*.md; do
+    grep -iE '(clos(e|es|ed)|fix(e[sd])?|resolv(e|es|ed)) #' "$f" \
+      | grep -qivE 'never|not|refus|instead of|rather than' \
+      && { echo "::error::$(basename "$f") tells a reader to use a closing keyword; the naming gate refuses one. Write Refs #N." >&2; rc=1; }
+  done
+
   # SOMEBODY MUST DRIVE THE COMBINATION. Every gate certifies one head against main and every
   # reviewer reads one branch, so two pull requests that interact are verified by nobody. Product is
   # the only role that sees the merged tree, and three reviewers in a row reported the gap unprompted.
