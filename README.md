@@ -74,7 +74,7 @@ Five checks, and the set is frozen. A sixth is a decision for whoever owns the p
 | **Branch name and commit convention** | `<role>/<type>/<issue>-<slug>`, subjects under 72 characters, an `Agent:` trailer, and **no closing keyword** — closing belongs to whoever verified the work. |
 | **Tasks complete** | every OpenSpec task ticked, and on a spec-driven project a change openspec can actually archive. |
 | **Generated files not hand-authored** | `openspec/specs/**` changes through archiving, not editing. |
-| **Reviewed by an agent that authored none of its commits** | independence derived from the `Agent:` trailers. |
+| **Reviewed by an agent that authored none of its commits** | independence derived from the `Agent:` trailers — **except a commit that changes nothing outside `openspec/`**, which confers no authorship. Product must archive onto the branch before merging, and without that exemption it authors every feature and qa becomes the only role that can certify one. **The exemption is earned by the diff, never claimed by the subject line.** |
 
 **No OpenSpec in your project?** Two of those say `NOT APPLICABLE` and pass, saying so. A gate that
 blocks every pull request in a repository it does not apply to is worse than no gate.
