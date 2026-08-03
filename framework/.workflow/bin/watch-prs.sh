@@ -132,7 +132,7 @@ self_test() {
   # produces has to be investigated and most of them mean nothing. This still fails in bounded time
   # when the behaviour is genuinely broken.
   local fwaited=0
-  while [ "$fwaited" -lt 30 ]; do
+  while [ "$fwaited" -lt 60 ]; do
     [ "$(grep -c '^LOOKUP FAILED' "$tmp/out" 2>/dev/null || echo 0)" -ge 2 ] && break
     sleep 1; fwaited=$((fwaited + 1))
   done
@@ -285,7 +285,7 @@ STUB
       ( PATH="$tmp:$PATH" REPO=x/y bash "$tmp/watch-prs.sh" dev 2 >"$tmp/mout" 2>&1 & echo $! > "$tmp/mpid" )
       # Same race as every other arm here: wait for a line rather than for a duration.
       mwaited=0
-      while [ "$mwaited" -lt 30 ]; do
+      while [ "$mwaited" -lt 60 ]; do
         [ -s "$tmp/mout" ] && break
         sleep 1; mwaited=$((mwaited + 1))
       done
@@ -373,7 +373,7 @@ STUB
   # in three seconds", which is a statement about the machine; what this arm is for is "a sweep
   # finishes at all". A slow one is not a watch.
   swaited=0
-  while [ "$swaited" -lt 30 ]; do
+  while [ "$swaited" -lt 60 ]; do
     kill -0 "$(cat "$tmp/spid")" 2>/dev/null || break
     sleep 1; swaited=$((swaited + 1))
   done

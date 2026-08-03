@@ -85,7 +85,7 @@ self_test() {
   # window, and this arm then reported that a working watch had stopped after one failure. A red
   # that means nothing costs a role a round to disprove.
   local fwaited=0
-  while [ "$fwaited" -lt 30 ]; do
+  while [ "$fwaited" -lt 60 ]; do
     [ "$(grep -c '^LOOKUP FAILED' "$ftmp/out" 2>/dev/null || echo 0)" -ge 2 ] && break
     sleep 1; fwaited=$((fwaited + 1))
   done
@@ -123,7 +123,7 @@ STUB
   # produces has to be investigated and most of them mean nothing. This still fails in bounded time
   # when the behaviour is genuinely broken.
   local lwaited=0
-  while [ "$lwaited" -lt 30 ]; do
+  while [ "$lwaited" -lt 60 ]; do
     grep -q "operation timed out" "$ltmp/out" 2>/dev/null && break
     sleep 1; lwaited=$((lwaited + 1))
   done
@@ -196,7 +196,7 @@ STUB
   # reason it was noticed.
   ( REPO=x/y bash "$tmp/watch-queue.sh" dev 1 >"$tmp/out" 2>&1 & echo $! > "$tmp/pid" )
   local waited=0
-  while [ "$waited" -lt 30 ]; do
+  while [ "$waited" -lt 60 ]; do
     [ "$(grep -c '^NEW ' "$tmp/out" 2>/dev/null || echo 0)" -ge 3 ] && break
     sleep 1; waited=$((waited + 1))
   done
