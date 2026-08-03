@@ -176,7 +176,11 @@ def loop(kind: str, role: str, interval: int, *, once: bool = False,
 
 
 def main(argv: list[str]) -> int:
-    if argv and argv[0] == "--self-test":
+    # `--self-test` ANYWHERE, NOT ONLY FIRST. The shims pass the watch kind as argv[0]
+    # (`watch-prs.sh` -> `watch.py prs "$@"`), so a first-position-only check read `--self-test` as
+    # the ROLE and refused it. Caught by running every installed script's self-test in a consumer,
+    # which is the only place the shims exist — the framework's own `make ci` skips them by design.
+    if "--self-test" in argv:
         return _self_test()
     if len(argv) < 2:
         print("usage: watch.py prs|queue|all <role> [interval] [--sweep]", file=sys.stderr)

@@ -415,8 +415,24 @@ def main(argv: list[str]) -> int:
     role = argv[0]
     try:
         repo = resolve_repo()
-        board = Board(client=Client(), repo=repo)
-        lines = role_queue(board, role)
+        client = Client()
+        board = Board(client=client, repo=repo)
+
+        # THE STATE COLUMN IS NOT DECORATION. Without it `YOUR PULL REQUESTS` lists three branches
+        # that cannot merge and says nothing about it — which is #38 and #46 sitting conflicted for
+        # a day and a half, reading as ordinary open work. It costs one read per pull request, which
+        # is what it cost before, and it is the read that tells a role its branch is dead in the
+        # water.
+        import pr as pr_mod
+
+        def state_of(p):
+            try:
+                return pr_mod.read_state(client, repo, p["number"]).brief
+            except LookupFailure as e:
+                # A STATE THAT COULD NOT BE READ IS NOT A GREEN, and it is not a conflict either.
+                return f"COULD NOT READ — {e.reason[:60]}"
+
+        lines = role_queue(board, role, state_of)
     except ValueError as e:
         print(f"::error::{e}", file=sys.stderr)
         return 1

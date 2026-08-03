@@ -65,7 +65,7 @@ trap cleanup EXIT
 # may certify its own work, which is a policy decision belonging to whoever owns the repository — and
 # a refresh that silently reverted it would restore a rule the owner had deliberately relaxed, in the
 # one place where a silent revert is least acceptable. Same seam as `.workflow/<role>/AGENT.md`.
-manifest() { ( cd "$SRC" && find .claude .github .workflow/bin .workflow/adf -type f -not -path "*/__pycache__/*" -not -name "*.pyc" | sed 's#^\./##' ); }
+manifest() { ( cd "$SRC" && find .claude .github .workflow/bin .workflow/adf -type f -not -path "*/__pycache__/*" -not -path "*/.pytest_cache/*" -not -name "*.pyc" | sed 's#^\./##' ); }
 
 # --- what would change -------------------------------------------------------
 declare -a overwrites=() news=()
@@ -147,6 +147,31 @@ fi
   echo "--force: REPLACING ${#modified[@]} file(s) this repository had changed. This is a revert:"
   printf '  ! %s\n' ${modified[@]+"${modified[@]}"}
 }
+
+# --- AND IT REMOVES WHAT IT NO LONGER SHIPS -----------------------------------
+# A FRAMEWORK FILE LEFT BEHIND STILL RUNS, AND THAT IS THE DANGER. Measured on the first install
+# after the machinery moved to Python: `.workflow/bin/roles.sh` was gone from the framework and
+# still sitting in the consumer, carrying its own copy of the role list — which is Issue #126
+# exactly, the defect that file was created to end, resurrected by the file's own corpse. Anything
+# that sourced it would have got a second, diverging list.
+#
+# SCOPED TO WHAT THIS INSTALLER HAS EVER OWNED, and to nothing else. It removes only files under
+# the framework's own directories that are absent from the CURRENT manifest — never a project's
+# own file, never `.workflow/<role>/`, never `.workflow/PROJECT.md` or `review-policy`.
+prune_removed() {
+  local kept="$1" f
+  while IFS= read -r f; do
+    case "$f" in
+      */__pycache__/*|*.pyc) rm -f "$target/$f"; continue ;;
+    esac
+    if ! printf '%s\n' "$kept" | grep -qxF "$f"; then
+      rm -f "$target/$f"
+      echo "  - $f (no longer shipped)"
+    fi
+  done < <( cd "$target" && find .workflow/bin .workflow/adf .github/workflows -type f 2>/dev/null | sed 's#^\./##' )
+  find "$target/.workflow" -type d -empty -delete 2>/dev/null || true
+}
+prune_removed "$(manifest)"
 
 # THE FRAMEWORK OWNS .claude/ AND OVERWRITES IT WITHOUT ASKING. That is safe only because a project
 # never edits those files: everything project-specific goes in .workflow/<role>/AGENT.md, which this
