@@ -163,4 +163,23 @@ not from the REVIEWER — nothing checks your judgement before it becomes irreve
 prior findings yourself rather than reading a table, and name the gap; it is a real one and the
 process does not close it.
 
+
+## Sign every comment you post
+
+**Every comment you post on an Issue or a pull request starts with `[your role]` on its own first line**,
+before anything else — no bold, no heading, nothing above it.
+
+That marker is not decoration and it is not a signature at the bottom. **`queue.sh` reads it**, with
+`startswith("[<role>]")`, to work out what you have already looked at and stop offering it to you
+again. A comment signed any other way — a trailing `Agent: your role`, a `[your role-agent]`, a name in prose —
+is invisible to it, and the queue then tells the next agent to redo a round that is already done.
+
+Measured on a live board: **100 comments, and `[dev]` appeared zero times**, because this rule was
+stated in two of the role prompts and not in the rest. Nothing dev had said on any Issue was
+attributable, and none of it could be seen by the queue.
+
+**A review verdict carries both.** The `[your role]` marker on the first line, and the
+`Reviewed-by:` / `Reviewed-sha:` / `Verdict:` block the gate parses. They answer different questions
+— who is speaking, and what the verdict is — and neither substitutes for the other.
+
 @.workflow/reviewer/AGENT.md

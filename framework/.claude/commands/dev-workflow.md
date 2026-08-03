@@ -26,6 +26,24 @@ if the queue offers it to you, your verdict will count. Eleven pull requests onc
 of them red for want of a review that was in nobody's queue at all; every role read its queue,
 learned it had nothing, and stopped.
 
+**ONE MONITOR, NOT TWO — `watch-all.sh` supervises both and restarts either one that dies.**
+
+```
+Monitor(command: "./.workflow/bin/watch-all.sh dev 60", description: "dev: queue and PRs", persistent: true)
+```
+
+It starts `watch-queue.sh` and `watch-prs.sh`, checks both every five seconds, and brings back
+whichever has died — announcing **`WATCH RESTARTED <which> (exit n)`** with a running count, because
+a supervisor that silently patches over a crash loop looks exactly like one with nothing wrong.
+
+**Why one and not two:** a role that starts two monitors is repeatedly observed to end up with one,
+and *which* half is missing is the part nobody notices. Keep only the queue watch and new Issues
+still arrive, so everything looks fine — you simply never learn again that a gate went red or that a
+pull request is waiting on your verdict. Restarting was previously something you had to remember
+while doing something else, which is not a mechanism.
+
+**`SUPERVISOR DIED` or a long silence still means you are blind.** Restart it and sweep — see below.
+
 ### A watch can die, and a dead watch looks exactly like a quiet queue
 
 **Being woken is an optimisation. It is never how you find out what is waiting on you.** A monitor is
@@ -186,5 +204,24 @@ a green check run means the job ran; the verdict is the commit status below it.
 
 Findings along the way: **open at most one new Issue**, the rest as comments on the rolling debt
 Issue. Label every Issue `area:product` or `area:machinery`.
+
+
+## Sign every comment you post
+
+**Every comment you post on an Issue or a pull request starts with `[dev]` on its own first line**,
+before anything else — no bold, no heading, nothing above it.
+
+That marker is not decoration and it is not a signature at the bottom. **`queue.sh` reads it**, with
+`startswith("[<role>]")`, to work out what you have already looked at and stop offering it to you
+again. A comment signed any other way — a trailing `Agent: dev`, a `[dev-agent]`, a name in prose —
+is invisible to it, and the queue then tells the next agent to redo a round that is already done.
+
+Measured on a live board: **100 comments, and `[dev]` appeared zero times**, because this rule was
+stated in two of the role prompts and not in the rest. Nothing dev had said on any Issue was
+attributable, and none of it could be seen by the queue.
+
+**A review verdict carries both.** The `[dev]` marker on the first line, and the
+`Reviewed-by:` / `Reviewed-sha:` / `Verdict:` block the gate parses. They answer different questions
+— who is speaking, and what the verdict is — and neither substitutes for the other.
 
 @.workflow/dev/AGENT.md

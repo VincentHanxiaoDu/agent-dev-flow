@@ -51,6 +51,24 @@ if the queue offers it to you, your verdict will count. Eleven pull requests onc
 of them red for want of a review that was in nobody's queue at all; every role read its queue,
 learned it had nothing, and stopped.
 
+**ONE MONITOR, NOT TWO — `watch-all.sh` supervises both and restarts either one that dies.**
+
+```
+Monitor(command: "./.workflow/bin/watch-all.sh qa 60", description: "qa: queue and PRs", persistent: true)
+```
+
+It starts `watch-queue.sh` and `watch-prs.sh`, checks both every five seconds, and brings back
+whichever has died — announcing **`WATCH RESTARTED <which> (exit n)`** with a running count, because
+a supervisor that silently patches over a crash loop looks exactly like one with nothing wrong.
+
+**Why one and not two:** a role that starts two monitors is repeatedly observed to end up with one,
+and *which* half is missing is the part nobody notices. Keep only the queue watch and new Issues
+still arrive, so everything looks fine — you simply never learn again that a gate went red or that a
+pull request is waiting on your verdict. Restarting was previously something you had to remember
+while doing something else, which is not a mechanism.
+
+**`SUPERVISOR DIED` or a long silence still means you are blind.** Restart it and sweep — see below.
+
 ### A watch can die, and a dead watch looks exactly like a quiet queue
 
 **Being woken is an optimisation. It is never how you find out what is waiting on you.** A monitor is
