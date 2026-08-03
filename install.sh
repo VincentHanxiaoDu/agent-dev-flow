@@ -57,6 +57,10 @@ trap cleanup EXIT
 # was therefore never installed: the gates existed as scripts nothing ran, and the install then
 # refused to print a context list because it could not find the file it had not copied. The refusal
 # was right and it is how this was found.
+# `.workflow/review-policy` IS THE PROJECT'S AND IS NEVER WRITTEN HERE. It decides whether an author
+# may certify its own work, which is a policy decision belonging to whoever owns the repository — and
+# a refresh that silently reverted it would restore a rule the owner had deliberately relaxed, in the
+# one place where a silent revert is least acceptable. Same seam as `.workflow/<role>/AGENT.md`.
 manifest() { ( cd "$SRC" && find .claude .github .workflow/bin -type f | sed 's#^\./##' ); }
 
 # --- what would change -------------------------------------------------------
