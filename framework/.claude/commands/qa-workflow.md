@@ -18,19 +18,9 @@ You are the **qa agent**. Focus: $ARGUMENTS
 
 ## 2. Then keep watching
 
-Start a monitor so new work wakes you instead of waiting to be asked:
-
-```
-Monitor(command: "./.workflow/bin/watch-queue.sh qa 60", description: "bugs and chores to verify", persistent: true)
-```
-
 It emits `NEW #<n> <title>` when work appears, and **`LOOKUP FAILED: <reason>` when a poll cannot be
 answered** — because an expired token and a quiet queue look identical otherwise, and a role that
 cannot tell them apart sits idle believing it is finished.
-
-```
-Monitor(command: "./.workflow/bin/watch-prs.sh qa 60", description: "qa PRs going red or needing changes", persistent: true)
-```
 
 That second one is why a red gate reaches you. It emits **`FAILING`, `CHANGES`, `READY` and
 `MERGED`** — every terminal state, not only the good one, because a watch that announced success
@@ -54,7 +44,7 @@ learned it had nothing, and stopped.
 **ONE MONITOR, NOT TWO — `watch-all.sh` supervises both and restarts either one that dies.**
 
 ```
-Monitor(command: "./.workflow/bin/watch-all.sh qa 60", description: "qa: queue and PRs", persistent: true)
+Monitor(command: "./.workflow/bin/watch-all.sh qa 300", description: "qa: queue and PRs", persistent: true)
 ```
 
 It starts `watch-queue.sh` and `watch-prs.sh`, checks both every five seconds, and brings back
@@ -68,6 +58,20 @@ pull request is waiting on your verdict. Restarting was previously something you
 while doing something else, which is not a mechanism.
 
 **`SUPERVISOR DIED` or a long silence still means you are blind.** Restart it and sweep — see below.
+
+**300 seconds, not 60, and the number is measured.** One poll of both watches costs a role about 52
+API calls on a six-pull-request board, so three roles at 60s is ~9360 calls/hour against a limit of
+5000 — **1.9× over, before any agent does any work of its own.** The watch then spends the budget you
+need to review, merge and close, and reports `LOOKUP FAILED` for polls its own polling made
+impossible. Nothing on a review board moves on a sixty-second timescale.
+
+**The watches now stand down before they starve you.** Below a reserve of 1500 calls they stop
+polling and emit `HOLDING — <n> left ... resets in Ns` — a third state, distinct from a failed lookup
+and from a quiet board: alive, deliberately idle, and it says when it resumes. Reading the limit is
+free and does not spend it.
+
+**If you find yourself rate-limited anyway, do not lower the interval to compensate.** Raise it, or
+raise `ADF_BUDGET_RESERVE`. A role competing with its own watch loses twice.
 
 ### A watch can die, and a dead watch looks exactly like a quiet queue
 

@@ -12,11 +12,6 @@ You are the **dev agent**. Focus: $ARGUMENTS
 ./.workflow/bin/queue.sh dev
 ```
 
-```
-Monitor(command: "./.workflow/bin/watch-queue.sh dev 60", description: "new Issues", persistent: true)
-Monitor(command: "./.workflow/bin/watch-prs.sh dev 60",   description: "your PRs", persistent: true)
-```
-
 **A failed lookup is not an empty queue** — if `queue.sh` exits non-zero you have **not learned that you have no work**. Retry or report; never proceed as though it were empty.
 
 **Your queue includes pull requests awaiting an independent verdict** — ones you authored none of
@@ -29,7 +24,7 @@ learned it had nothing, and stopped.
 **ONE MONITOR, NOT TWO — `watch-all.sh` supervises both and restarts either one that dies.**
 
 ```
-Monitor(command: "./.workflow/bin/watch-all.sh dev 60", description: "dev: queue and PRs", persistent: true)
+Monitor(command: "./.workflow/bin/watch-all.sh dev 300", description: "dev: queue and PRs", persistent: true)
 ```
 
 It starts `watch-queue.sh` and `watch-prs.sh`, checks both every five seconds, and brings back
@@ -43,6 +38,20 @@ pull request is waiting on your verdict. Restarting was previously something you
 while doing something else, which is not a mechanism.
 
 **`SUPERVISOR DIED` or a long silence still means you are blind.** Restart it and sweep — see below.
+
+**300 seconds, not 60, and the number is measured.** One poll of both watches costs a role about 52
+API calls on a six-pull-request board, so three roles at 60s is ~9360 calls/hour against a limit of
+5000 — **1.9× over, before any agent does any work of its own.** The watch then spends the budget you
+need to review, merge and close, and reports `LOOKUP FAILED` for polls its own polling made
+impossible. Nothing on a review board moves on a sixty-second timescale.
+
+**The watches now stand down before they starve you.** Below a reserve of 1500 calls they stop
+polling and emit `HOLDING — <n> left ... resets in Ns` — a third state, distinct from a failed lookup
+and from a quiet board: alive, deliberately idle, and it says when it resumes. Reading the limit is
+free and does not spend it.
+
+**If you find yourself rate-limited anyway, do not lower the interval to compensate.** Raise it, or
+raise `ADF_BUDGET_RESERVE`. A role competing with its own watch loses twice.
 
 ### A watch can die, and a dead watch looks exactly like a quiet queue
 
