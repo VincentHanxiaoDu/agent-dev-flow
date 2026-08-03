@@ -14,10 +14,14 @@ REF=${ADF_REF:-main}
 # --protect CONFIGURES BRANCH PROTECTION. It is opt-in and never a default: it changes who can
 # write to `main`, which is a repository policy decision and not this script's to make for someone.
 protect=no
+force=no
 args=()
 for a in "$@"; do
   case "$a" in
     --protect) protect=yes ;;
+    # OVERWRITE A FILE THIS REPOSITORY HAS CHANGED. Opt-in for the same reason --protect is: it
+    # destroys work, and the refusal below exists because it did.
+    --force) force=yes ;;
     -*) echo "error: unknown option '$a'. This is a typo, not a path — refusing." >&2; exit 2 ;;
     *) args+=("$a") ;;
   esac
@@ -71,8 +75,78 @@ while IFS= read -r f; do
 done < <(manifest)
 
 echo "agent-dev-flow -> $target"
-[ ${#news[@]} -eq 0 ]       || { echo; echo "new (${#news[@]}):";       printf '  + %s\n' "${news[@]}"; }
-[ ${#overwrites[@]} -eq 0 ] || { echo; echo "replaced (${#overwrites[@]}):"; printf '  ~ %s\n' "${overwrites[@]}"; }
+[ ${#news[@]} -eq 0 ]       || { echo; echo "new (${#news[@]}):";       printf '  + %s\n' ${news[@]+"${news[@]}"}; }
+[ ${#overwrites[@]} -eq 0 ] || { echo; echo "replaced (${#overwrites[@]}):"; printf '  ~ %s\n' ${overwrites[@]+"${overwrites[@]}"}; }
+
+# --- A REFRESH MUST NOT SILENTLY REVERT A FIX THE TARGET REPOSITORY MADE ------
+#
+# THIS IS THE MOST EXPENSIVE DEFECT THIS INSTALLER HAS HAD, and it fired repeatedly. Measured:
+#
+#   - A refresh deleted a merged fix. `pr-authors.sh` went from 332 lines to 264 with all three
+#     `return 3` sites gone, `queue.sh` lost its author-lookup fix entirely, four machinery tests
+#     went red, and `main` carried a LIVE FAIL-OPEN for the time it took somebody to notice. The
+#     reviewer of the original fix had written "a refresh that reintroduces either defect turns the
+#     repo red" — and it did, within minutes.
+#   - Measured again later, larger: the framework's own copies were 1,179 lines BEHIND the
+#     repository running them. Every fail-open fixed downstream existed only downstream, and this
+#     script would have replaced all of it without a word.
+#
+# The old behaviour printed `replaced (N)` and copied anyway. That line is true and it is not a
+# control: it names files, not consequences, and it appears identically whether the target's copy is
+# an old framework version or a fix somebody made this morning.
+#
+# THE TWO CASES ARE DISTINGUISHABLE, AND `.agent-dev-flow` IS WHAT DISTINGUISHES THEM. It records the
+# framework sha this repository was last installed from. So:
+#   - target's copy == that sha's copy  ->  the target never touched it. An ordinary upgrade. Silent.
+#   - target's copy != that sha's copy  ->  the target CHANGED it. That change is the thing at risk,
+#                                           and it is not this script's to discard.
+#
+# WITHOUT GIT — a curl install with no clone — the sha cannot be resolved, so the distinction cannot
+# be made. It then refuses on ANY difference rather than guessing, which is the same rule this
+# framework applies everywhere else: could not determine is not determined to be nothing.
+declare -a modified=()
+old_sha=""
+[ -f "$target/.agent-dev-flow" ] && old_sha=$(sed -n 's/^sha=//p' "$target/.agent-dev-flow" | head -1)
+# `${a[@]+"${a[@]}"}`, NOT `"${a[@]}"`. Under `set -u` bash 3.2 — which is what macOS ships — an
+# EMPTY array expands to an unbound-variable error, so this died on the one path that matters most:
+# a first install, where nothing is being overwritten at all. It printed the whole plan and then
+# copied nothing, with a zero exit code.
+for f in ${overwrites[@]+"${overwrites[@]}"}; do
+  keep=yes
+  if [ -n "$SELF_DIR" ] && [ -n "$old_sha" ] && [ "$old_sha" != unknown ] \
+     && git -C "$SELF_DIR" cat-file -e "$old_sha" 2>/dev/null; then
+    if git -C "$SELF_DIR" show "$old_sha:framework/$f" 2>/dev/null | cmp -s - "$target/$f"; then
+      keep=no   # untouched since it was installed — an ordinary upgrade
+    fi
+  fi
+  # AN `if`, NOT `[ ... ] && ...`. Under `set -e` a trailing false command makes the LOOP return
+  # non-zero, and on the last iteration that ends the script — an installer that silently stops
+  # having printed a plan it did not carry out.
+  if [ "$keep" = yes ]; then modified+=("$f"); fi
+done
+
+if [ ${#modified[@]} -ne 0 ] && [ "$force" != yes ]; then
+  echo
+  echo "REFUSING TO INSTALL. ${#modified[@]} file(s) this repository has CHANGED would be replaced:"
+  printf '  ! %s\n' ${modified[@]+"${modified[@]}"}
+  echo
+  echo "  These differ from the copy this repository was installed with, so the difference is work"
+  echo "  done HERE — very likely a fix made because this repository hit the bug. Replacing it is a"
+  echo "  silent revert, and it has produced a live fail-open on a protected branch before."
+  echo
+  echo "  See exactly what would be lost:"
+  for f in ${modified[@]+"${modified[@]}"}; do echo "    diff \"$target/$f\" \"$SRC/$f\""; done
+  echo
+  echo "  UPSTREAM THE FIX FIRST — that is the only outcome where it survives the NEXT refresh too."
+  echo "  Then re-run this. If you have already done that, or the change is genuinely disposable:"
+  echo "    $0 $target --force"
+  exit 1
+fi
+[ ${#modified[@]} -eq 0 ] || {
+  echo
+  echo "--force: REPLACING ${#modified[@]} file(s) this repository had changed. This is a revert:"
+  printf '  ! %s\n' ${modified[@]+"${modified[@]}"}
+}
 
 # THE FRAMEWORK OWNS .claude/ AND OVERWRITES IT WITHOUT ASKING. That is safe only because a project
 # never edits those files: everything project-specific goes in .workflow/<role>/AGENT.md, which this
@@ -103,10 +177,63 @@ every project.
 What does not: how the process works. That is the framework's half, and if you find yourself
 restating it here, the framework is missing something — change it there.
 
+**Run \`/config-workflow\` rather than filling this in by hand.** It reads the repository, asks the
+owner what it could not establish, and writes the shared half into \`.workflow/PROJECT.md\`.
+
 _(empty — nothing project-specific yet)_
 EOF
   echo "  + .workflow/$role/AGENT.md"
 done
+
+# --- each role's own memory, created once and then left alone -----------------
+# A ROLE THAT CANNOT REMEMBER REDISCOVERS THE SAME THING EVERY SESSION, AND SO DOES EVERY OTHER ROLE.
+# Measured: a verifier spent a round establishing that the project's test runner caches results and
+# needs a flag to re-run, and wrote it nowhere — so the finding died with the session. Multiply by
+# three roles and every restart.
+#
+# SEPARATE FROM AGENT.md ON PURPOSE. AGENT.md is configuration, written by `/config-workflow` and by
+# people; MEMORY.md is written by the role itself, mid-round. One file for both means an agent
+# appending a note rewrites the configuration it was handed, which is the failure this seam exists
+# to prevent — one level in from the seam between the framework and the project.
+for role in dev qa product ops reviewer; do
+  d="$target/.workflow/$role"
+  [ -f "$d/MEMORY.md" ] && { echo "  = .workflow/$role/MEMORY.md (kept)"; continue; }
+  cat > "$d/MEMORY.md" <<EOF
+# What the $role role has learned about this project
+
+**This file is yours, and the installer never overwrites it.** Write to it the moment you learn
+something that cost you time and would cost the next round the same time — how this project actually
+behaves, where the traps are, and what you tried that did not work.
+
+Not here: work state (that is Issues and pull requests), decisions (those are \`[owner-ruling]\` on
+the Issue), project configuration (that is \`.workflow/PROJECT.md\`), or how the process works.
+
+Newest first. Date every entry. **Delete what has stopped being true** — a role acting confidently on
+a stale note is worse off than one that knew nothing.
+
+_(empty — nothing learned yet)_
+EOF
+  echo "  + .workflow/$role/MEMORY.md"
+done
+
+# --- the shared, project-owned answer to "how is this thing built and tested" --
+# WRITTEN BY `/config-workflow`, STUBBED HERE so that every role prompt's `@.workflow/PROJECT.md`
+# resolves from the first session rather than reading as a missing file. A stub that says it is empty
+# is an answer; a missing file is a role guessing.
+if [ ! -f "$target/.workflow/PROJECT.md" ]; then
+  cat > "$target/.workflow/PROJECT.md" <<'EOF'
+# How this project is built, tested and accepted
+
+**NOT CONFIGURED YET — run `/config-workflow`.**
+
+Until it is, no role knows how to build this project, how to run its tests, what an end-to-end run
+needs, or which build product accepts against. Every role will work that out separately, and they
+will not all reach the same answer.
+
+Nothing below this line is established. Do not treat an empty section as "there is nothing to do".
+EOF
+  echo "  + .workflow/PROJECT.md (stub — run /config-workflow)"
+fi
 
 # THE SHA IS RECORDED, NOT JUST THE BRANCH. I fixed the same defect in the framework three times
 # and each time the repository under test still carried the old copy, because a manual refresh is a
@@ -283,6 +410,7 @@ Installed and verified.
   /dev-workflow           resolve Issues into reviewed branches
   /qa-workflow            verify bugs and chores, merge, close
   /product-workflow       UAT features, close, decide to release
+  /config-workflow        tell it how THIS project is built, tested and accepted — run this first
   /create-feature <what>  turn a description into Issues with testable criteria
   /release-version <tag>  tag and publish a release product has called
 
@@ -315,5 +443,7 @@ if [ ! -d "$target/openspec" ]; then
   echo "    Two gates read openspec/ and both pass, saying NOT APPLICABLE, while it is absent."
   echo "    With it, dev writes a change per Issue and product archives before the merge."
 fi
-echo "  - put this project's own instructions in .workflow/<role>/AGENT.md — build commands,"
-echo "    domain vocabulary, conventions a newcomer gets wrong. The framework never touches those." 
+echo "  - RUN /config-workflow. It reads this repository, asks you only what it could not work out"
+echo "    — dev environment, the exact test commands, front end, end-to-end, which build product"
+echo "    accepts against, what 'done' means here — and writes .workflow/PROJECT.md, which every"
+echo "    role loads. Skip it and each role works the same things out separately, several times." 

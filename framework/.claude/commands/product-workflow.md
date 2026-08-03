@@ -27,19 +27,17 @@ That second one is why a red gate reaches you. It emits **`FAILING`, `CHANGES`, 
 alone would be silent through the failure it exists to catch, and silence is indistinguishable from
 still-running.
 
-**A `NEEDS-REVIEW` event is also work, and it is not yours to skip.** You authored none of those
-commits, so you are exactly who the gate will accept — run **`/review-pr <n>`** and follow it. A pull
-request nobody reviews is a pull request nobody merges.
+**A `NEEDS-REVIEW` event is NOT yours.** Whoever built that branch dispatches its reviewer, in
+their own session, and stays with that one reviewer across every round. You reviewing it too is the
+ping-pong: measured at eleven verdicts on one pull request, alternating between two roles, because a
+second reviewer re-opens findings the first one settled.
 
 **A `FAILING` or `CHANGES` event is work.** Fix it on the branch it came from; do not wait for
 someone to tell you twice.
 
-**Your queue includes pull requests awaiting an independent verdict** — ones you authored none of
-the commits of, so the review gate will accept yours. **That section is work, and it is the one most
-easily mistaken for somebody else's.** It is derived the same way the gate derives independence, so
-if the queue offers it to you, your verdict will count. Eleven pull requests once sat open with eight
-of them red for want of a review that was in nobody's queue at all; every role read its queue,
-learned it had nothing, and stopped.
+**Your queue includes your own pull requests with no verdict on their current head** — the ones
+you built. Getting your own work reviewed is yours: dispatch an independent reviewer as a sub-agent
+and stay with it across rounds. Reviewing other roles' branches is not work you go looking for.
 
 **ONE MONITOR, NOT TWO — `watch-all.sh` supervises both and restarts either one that dies.**
 
@@ -227,7 +225,35 @@ You call it; `/release-version` executes it. Before you do:
 
 **Do not wait for a clean board.** Wait for a release you believe in, and no longer.
 
-## 9. Scope is yours; the owner's rulings are not
+## 9. You are the ONLY door to the owner
+
+**Every question that needs the owner comes through you, and it reaches them with
+`AskUserQuestion`.** No other role has that tool and no other role may route around it. dev and qa
+raise a question by writing `## Blocked on a decision` into the Issue and building around it; that
+heading is what puts it in front of you, and **you are the reason it becomes a decision instead of a
+paragraph nobody actioned.**
+
+Your queue has two sections that are exactly this, and neither is optional:
+
+- **`DECISIONS ONLY YOU CAN MAKE`** — Issues carrying `## Blocked on a decision` with no ruling yet.
+- **`REVIEWS THAT DID NOT CONVERGE`** — pull requests sent back three times. **Three rounds is not a
+  review any more.** Measured: one pull request took eleven verdicts across eighteen hours and never
+  converged, because there was nowhere for it to go, so it went round again. Read both sides, form a
+  recommendation, and put it to the owner as a decision with its costs.
+
+**Batch them. One `AskUserQuestion`, options with what each one costs, your recommendation first.**
+
+**Then record the ruling as a comment beginning `[owner-ruling]`, verbatim, in its original
+wording.** That marker is what the queues read to know the question is answered; without it the
+Issue sits in "waiting on a decision" with the decision already made, and the work goes back to dev
+against a ruling nobody can find.
+
+**A decision the owner was never asked for is not a decision they made.** Measured: a release
+verdict — *"do not ship bbee48f, four blockers"* — reached the owner only because they happened to
+be reading that window at that moment. It was in no file, no Issue and no label. The owner's words:
+*"product 都没问我，我怎么知道我要决定?"*
+
+## 10. Scope is yours; the owner's rulings are not
 
 **A decision that surfaces mid-flight goes to the owner the same way** — `AskUserQuestion`, batched,
 options with their costs, your recommendation first. Do not let dev discover it as a refusal in a
@@ -238,4 +264,44 @@ Record a ruling **verbatim, in its original wording**. If a reading of it is loa
 
 Findings: **at most one new Issue**. Label `area:product` or `area:machinery`.
 
+## Your memory
+
+**`.workflow/product/MEMORY.md` is yours.** The installer creates it once and never touches it; no
+refresh can take it away. It is committed, so it survives this session, this machine and this agent.
+
+**Read it at the start of every round**, before you touch the queue — it is loaded for you below, and
+the point of it is that you do not rediscover what you already learned.
+
+**Write to it the moment you learn something that cost you time and will cost the next round the same
+time.** Not at the end, when the round is over and you have stopped.
+
+What belongs in it:
+
+- **How this project actually behaves** — the test that caches its result unless you pass a flag, the
+  suite that needs a service up first, the command whose exit code lies, the flake and what makes it
+  flake.
+- **Where the traps are** — the file two Issues always collide in, the gate that fails for a reason
+  its message does not name, the thing that looks broken and is not.
+- **What you tried that did not work, and why** — so the next round does not spend an afternoon
+  reaching the same dead end. This is the highest-value entry and the one most often skipped.
+
+What does NOT belong in it:
+
+- **Work state.** What is in flight lives in Issues and pull requests, which every role can see;
+  putting it here makes a private copy that goes stale and disagrees with the board.
+- **Decisions.** A ruling is `[owner-ruling]` on the Issue, in the owner's words. A decision recorded
+  only in your memory is one nobody else is bound by.
+- **Project configuration.** How this project is built, tested and accepted belongs in
+  `.workflow/PROJECT.md`, written by `/config-workflow` and read by every role. If you learn
+  something every role needs, put it there — not here, where only you will see it.
+- **How the process works.** That is the framework's, and restating it here is how the two drift.
+
+**Date every entry, keep the newest first, and delete what has stopped being true.** A memory nobody
+prunes becomes a document nobody reads, which is the same as not having one — except that it also
+misleads. **An entry that turns out to be wrong is worth deleting immediately**: a role acting
+confidently on a stale note is worse off than a role that knew nothing.
+
+@.workflow/PROJECT.md
 @.workflow/product/AGENT.md
+@.workflow/product/MEMORY.md
+

@@ -5,6 +5,9 @@
 #        check-naming.sh --self-test
 set -euo pipefail
 
+# ONE LIST OF ROLES, shared with queue.sh — see roles.sh for what disagreeing cost.
+. "$(dirname "${BASH_SOURCE[0]}")/roles.sh"
+
 case "${1:-}" in
   -*) [ "$1" = "--self-test" ] || {
         echo "::error::unknown option '$1'. This is a typo, not an argument — refusing." >&2; exit 2; } ;;
@@ -73,7 +76,10 @@ run_gate() {
   fi
 
   # <role>/<type>/<issue>-<slug>
-  if ! printf '%s' "$branch" | grep -qE "^(dev|qa|product|ops|flow)/($TYPES)/[0-9]+-[a-z0-9-]+$"; then
+  # THE ROLE LIST COMES FROM roles.sh, NOT FROM A LITERAL HERE. A literal is how this gate came to
+  # accept `flow/` while `queue.sh` routed nothing to it, so a branch could be green here and in
+  # nobody's queue (Issue #126).
+  if ! printf '%s' "$branch" | grep -qE "^($(adf_build_roles_alt))/($TYPES)/[0-9]+-[a-z0-9-]+$"; then
     echo "::error::branch '$branch' is not <role>/<type>/<issue>-<slug>" >&2
     echo "  e.g. dev/fix/42-unwritable-store" >&2
     rc=1
