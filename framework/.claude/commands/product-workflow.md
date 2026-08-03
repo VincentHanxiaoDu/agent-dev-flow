@@ -235,7 +235,9 @@ paragraph nobody actioned.**
 
 Your queue has two sections that are exactly this, and neither is optional:
 
-- **`DECISIONS ONLY YOU CAN MAKE`** — Issues carrying `## Blocked on a decision` with no ruling yet.
+- **`DECISIONS RAISED BY OTHER ROLES`** — Issues carrying `## Blocked on a decision` with no
+  ruling yet. **You do not make these**; you are the channel that reaches somebody who can.
+  That wording — decisions only you can make — belongs to the owner's own queue, not to yours.
 - **`REVIEWS THAT DID NOT CONVERGE`** — pull requests sent back three times. **Three rounds is not a
   review any more.** Measured: one pull request took eleven verdicts across eighteen hours and never
   converged, because there was nowhere for it to go, so it went round again. Read both sides, form a

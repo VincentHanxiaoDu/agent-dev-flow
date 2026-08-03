@@ -160,3 +160,45 @@ def test_the_repository_comments_are_paginated_once_not_three_times():
     b = q.Board(client=c, repo="o/r")
     q.role_queue(b, "product")
     assert sum(1 for p in c.calls if p.endswith("issues/comments")) <= 1
+
+
+def test_every_section_a_role_prompt_promises_is_a_section_the_queue_produces():
+    """A PROMPT THAT DESCRIBES MACHINERY THAT IS NOT THERE IS A RULE NOTHING ENFORCES.
+
+    Found by differential-testing the port against the shell it replaced: product-workflow.md said
+    "Your queue has two sections that are exactly this, and neither is optional — DECISIONS ONLY YOU
+    CAN MAKE …", and `queue.sh product` HAD NO SUCH SECTION. Only the owner arm did. product was
+    told, every round, to read something that did not exist, and to route the owner's decisions from
+    a list it was never shown.
+
+    check-prompts.sh could not catch it: it asserts what the prompts SAY, and both halves were
+    internally consistent — the prompt promised a section and the queue produced a different set.
+    Only asking both the same question finds it.
+
+    SCOPED TO THE SENTENCE THAT MAKES THE PROMISE. A prompt mentions plenty of shouted strings that
+    are watch events rather than queue headings (`SUPERVISOR DIED`, `LOOKUP FAILED`), and asserting
+    over all of them would fail for a reason that has nothing to do with this defect — the shape of
+    wrong check this project keeps finding in itself.
+    """
+    import re
+    from pathlib import Path
+
+    cmds = Path(__file__).resolve().parents[3] / ".claude" / "commands"
+    if not cmds.is_dir():
+        return
+    for role, prompt in (("product", "product-workflow.md"), ("dev", "dev-workflow.md"),
+                         ("qa", "qa-workflow.md")):
+        f = cmds / prompt
+        if not f.is_file():
+            continue
+        text = f.read_text()
+        m = re.search(r"[Yy]our queue has .{0,40}sections?.{0,120}?:\n(.*?)\n\n", text, re.S)
+        if not m:
+            continue
+        produced = "\n".join(q.role_queue(board(), role))
+        for heading in re.findall(r"`([A-Z][A-Z ,\'\u2019\u2014-]{10,})`", m.group(1)):
+            assert heading.strip() in produced, (
+                f"{prompt} tells {role} its queue has a section '{heading.strip()}', and "
+                f"`queue.py {role}` does not produce it. The role is being sent, every round, to "
+                f"read something that is not there."
+            )

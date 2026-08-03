@@ -15,7 +15,17 @@ SHELL := /bin/bash
 ci:
 	@set -euo pipefail; \
 	rc=0; \
+	printf '%-26s ' "python suite"; \
+	if uv run --isolated --no-project --with pytest pytest framework/.workflow/adf/tests -q >/tmp/adf-py.out 2>&1; then \
+	  n=$$(grep -oE '[0-9]+ passed' /tmp/adf-py.out | head -1 | cut -d' ' -f1); \
+	  if [ -z "$$n" ] || [ "$$n" -lt 1 ]; then \
+	    echo "FAIL: the suite exited 0 and reported no passing tests. A run that COLLECTED NOTHING exits 0 too, and the two must not look the same."; rc=1; \
+	  else echo "OK ($$n tests)"; fi; \
+	else echo FAIL; sed 's/^/    /' /tmp/adf-py.out | tail -25; rc=1; fi; \
+	printf '%-26s ' "runtime is stdlib-only"; \
+	if uv run --isolated --no-project --with pytest pytest framework/.workflow/adf/tests/test_no_runtime_dependencies.py -q >/dev/null 2>&1; then echo OK; else echo FAIL; rc=1; fi; \
 	for s in framework/.workflow/bin/*.sh; do \
+	  if grep -q '^exec python3' "$$s"; then continue; fi; \
 	  if ! grep -q -- '--self-test' "$$s"; then \
 	    echo "FAIL: $$(basename $$s) ships no --self-test — it cannot be shown to fail"; rc=1; continue; \
 	  fi; \

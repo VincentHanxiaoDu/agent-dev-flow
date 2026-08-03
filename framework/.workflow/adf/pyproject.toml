@@ -23,4 +23,4 @@ dev = ["pytest>=8.0,<9"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # `-p no:cacheprovider`: the consumer's tree is not ours to litter with .pytest_cache.
-addopts = "-q -p no:cacheprovider"
+addopts = "-p no:cacheprovider"

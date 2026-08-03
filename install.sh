@@ -65,7 +65,7 @@ trap cleanup EXIT
 # may certify its own work, which is a policy decision belonging to whoever owns the repository — and
 # a refresh that silently reverted it would restore a rule the owner had deliberately relaxed, in the
 # one place where a silent revert is least acceptable. Same seam as `.workflow/<role>/AGENT.md`.
-manifest() { ( cd "$SRC" && find .claude .github .workflow/bin -type f | sed 's#^\./##' ); }
+manifest() { ( cd "$SRC" && find .claude .github .workflow/bin .workflow/adf -type f -not -path "*/__pycache__/*" -not -name "*.pyc" | sed 's#^\./##' ); }
 
 # --- what would change -------------------------------------------------------
 declare -a overwrites=() news=()

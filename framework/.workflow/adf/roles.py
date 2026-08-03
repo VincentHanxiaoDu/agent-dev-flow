@@ -41,3 +41,20 @@ def check_lists_agree() -> list[str]:
         for r in BUILD_ROLES
         if r not in ALL_ROLES
     ]
+
+
+if __name__ == "__main__":
+    import sys
+    # PRINTED FOR THE ONE BASH CALLER LEFT. check-naming.sh builds its branch pattern from this, so
+    # the two lists cannot drift — which is Issue #126 and the reason this module exists.
+    if len(sys.argv) > 1 and sys.argv[1] == "--alt":
+        print(build_roles_alt())
+    elif len(sys.argv) > 1 and sys.argv[1] == "--self-test":
+        problems = check_lists_agree()
+        for p in problems:
+            print(f"SELF-TEST FAIL: {p}", file=sys.stderr)
+        if not problems:
+            print("self-test passed: every build role is a role a queue answers for")
+        sys.exit(1 if problems else 0)
+    else:
+        print(" ".join(BUILD_ROLES))
