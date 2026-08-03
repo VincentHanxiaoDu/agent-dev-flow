@@ -352,40 +352,34 @@ REVIEW_MAX_ROUNDS=${ADF_REVIEW_MAX_ROUNDS:-3}
 # is now the PULL channel for the one case that leaves: the author opened a pull request and never
 # ran the review. That is the author's own work, in the author's own queue, and in nobody else's.
 unreviewed_own_prs() {
-  local role=$1 num sha title authors prs any=0 owner rounds
+  local role=$1 num sha branch title prs any=0 owner rounds
   resolve_repo
   prs=$(api --paginate "repos/$REPO/pulls?state=open&per_page=100")
   printf '\nYOUR PULL REQUESTS WITH NO VERDICT ON THE CURRENT HEAD — dispatch a reviewer before anything else:\n'
-  while IFS=$'\t' read -r num sha title; do
+  while IFS=$'\t' read -r num sha branch title; do
     [ -n "$num" ] || continue
-    # FETCHED OUTSIDE EVERY SUBSTITUTION, so a failed lookup exits rather than becoming "no verdicts
-    # exist", which would read as "go and review it again" on work already reviewed.
-    ensure_pr_comments "$num"
 
-    # THE SAME DERIVATION THE GATE USES, from the same file — see pr-authors.sh. This asks the
-    # opposite question it used to: not "am I independent of this" but "is this MINE to get
-    # reviewed". A pull request you did not build is not your responsibility to get a verdict on.
+    # WHOSE PULL REQUEST THIS IS COMES FROM ITS BRANCH NAME — `<role>/<type>/<issue>-<slug>`, which
+    # the naming gate already enforces and which `my_prs` already routes merges on. It costs nothing.
     #
-    # AND `2>/dev/null || echo ""` IS HOW THIS BROKE BEFORE (Issue #79). It converted a FAILED
-    # lookup into an empty author set, and an empty set is an answer here as well as there. Under a
-    # SECONDARY rate limit — which fails intermittently — the failure was invisible and the queue
-    # spoke with confidence about a question it had not asked.
+    # THE ALTERNATIVE WAS MEASURED AND IT WAS WORSE. Deriving it from the `Agent:` trailers means one
+    # API call per open pull request per role per round, to answer a question the branch name already
+    # answers: on a six-pull-request board that made dev's queue MORE expensive than the design it
+    # replaced, in a change whose point was to spend less.
     #
-    # EXIT, DO NOT SKIP THE PULL REQUEST. Silently dropping it is the other half of the same defect:
-    # the role reads `(none)` and concludes its board is clear, which is a wrong answer with a zero
-    # exit code, and this whole file exists to prevent that.
-    authors=$("$(dirname "${BASH_SOURCE[0]}")/pr-authors.sh" --pr "$num") || {
-      echo "::error::who built pull request #$num could not be determined, so the queue cannot say" >&2
-      echo "  whether it is yours to get reviewed. This is a LOOKUP FAILURE and NOT a statement that" >&2
-      echo "  nobody authored it, and NOT a statement that you have nothing waiting. Retry, or" >&2
-      echo "  report the outage — a secondary rate limit clears on its own; retrying in a loop" >&2
-      echo "  deepens it." >&2
-      exit 1
-    }
-    # NOT YOURS TO GET REVIEWED unless you built it. An empty author set means independence could
-    # not be established from the trailers, which the naming gate reports with its remedy; it is not
-    # a statement that this pull request is yours.
-    printf '%s\n' "$authors" | grep -qx "$role" || continue
+    # AND IT IS NOT THE INDEPENDENCE TEST. Nothing here decides who may certify anything — that is
+    # `check-review.sh`, which re-derives authorship from the trailers at verdict time and refuses an
+    # author's own verdict. This only decides whose queue a pull request appears in. The two were the
+    # same question when any independent role might be sent to review; they are not any more.
+    case "$branch" in
+      "$role"/*) : ;;
+      *) continue ;;
+    esac
+
+    # FETCHED OUTSIDE EVERY SUBSTITUTION — for the pull requests that are yours, and no others — so a
+    # failed lookup exits rather than becoming "no verdict exists", which reads as "go and review it"
+    # on work already reviewed.
+    ensure_pr_comments "$num"
 
     # THREE ROUNDS AND IT IS NOT A REVIEW PROBLEM ANY MORE. Below the limit this says nothing: a
     # second round is an ordinary review doing its job. At the limit it stops asking for another one.
@@ -412,7 +406,7 @@ unreviewed_own_prs() {
       printf '  #%-4s %-46s  NO REVIEW HAS HAPPENED — dispatch one now\n' \
         "$num" "$(printf '%s' "$title" | cut -c1-46)"
     fi
-  done < <(printf '%s' "$prs" | jq -r '.[] | [.number, .head.sha, .title] | @tsv' 2>/dev/null || true)
+  done < <(printf '%s' "$prs" | jq -r '.[] | [.number, .head.sha, .head.ref, .title] | @tsv' 2>/dev/null || true)
   [ "$any" -eq 1 ] || printf '  (none)\n'
 }
 
@@ -477,11 +471,20 @@ role_queue() {
   # so a ruling posted underneath left the Issue sitting in "waiting on a decision" with the
   # decision made. And the ruling means the build is now INCOMPLETE against it, so the Issue goes
   # back to dev even though it has been built once.
-  RULED=$(api --paginate "repos/$REPO/issues/comments?per_page=100" \
-    | jq -r '.[] | select(.body | startswith("**[owner-ruling]") or startswith("[owner-ruling]")) | .issue_url' 2>/dev/null \
+  # ONE FETCH, THREE QUESTIONS. This endpoint is every comment in the repository, paginated, and it
+  # was being pulled THREE times in one run of one role's queue — twice here and once more for the
+  # release count. Three roles and four watches share a 5,000/hour budget; measured in one day, 246
+  # rate-limit refusals, with the queue reporting LOOKUP FAILED for polls its own polling had made
+  # impossible. The three questions differ only in the jq that reads the answer.
+  #
+  # WRITTEN TO A FILE OUTSIDE A SUBSTITUTION, for the reason documented on `ensure_pr_comments`: a
+  # command substitution is a subshell and swallows `api`'s exit, which would turn an outage into
+  # "nobody has ruled on anything" — an answer, and the wrong one.
+  ALL_COMMENTS="$CACHE/all-comments.json"
+  [ -f "$ALL_COMMENTS" ] || api --paginate "repos/$REPO/issues/comments?per_page=100" > "$ALL_COMMENTS"
+  RULED=$(jq -r '.[] | select(.body | startswith("**[owner-ruling]") or startswith("[owner-ruling]")) | .issue_url' < "$ALL_COMMENTS" 2>/dev/null \
     | sed -n 's#.*/issues/##p' | sort -u)
-  VERIFIED=$(api --paginate "repos/$REPO/issues/comments?per_page=100" \
-    | jq -r --arg r "[$role]" '.[] | select(.body | startswith($r)) | .issue_url' 2>/dev/null \
+  VERIFIED=$(jq -r --arg r "[$role]" '.[] | select(.body | startswith($r)) | .issue_url' < "$ALL_COMMENTS" 2>/dev/null \
     | sed -n 's#.*/issues/##p' | sort -u)
   # MERGED, NOT MERELY OPENED. `state=all` counted a pull request that was CLOSED without merging,
   # so an abandoned attempt removed its Issue from dev's queue permanently — deleting the branch did
@@ -549,8 +552,7 @@ role_queue() {
       # one means ship, the other means you have been told nothing.
       local nb rel
       nb=$(printf '%s' "$ALL" | jq '[.[]|select(.pull_request==null)|select([.labels[].name]|index("blocks:release"))]|length')
-      rel=$(api --paginate "repos/$REPO/issues/comments?per_page=100" \
-            | jq -r '[.[] | select(.body | test("^\\[product\\][\\s\\S]*RELEASE"))] | length' 2>/dev/null || echo 0)
+      rel=$(jq -r '[.[] | select(.body | test("^\\[product\\][\\s\\S]*RELEASE"))] | length' < "$ALL_COMMENTS" 2>/dev/null || echo 0)
       printf '\nRELEASE\n'
       if [ "${nb:-0}" -gt 0 ]; then
         printf '  BLOCKED — %s Issue(s) labelled blocks:release are open, listed above.\n' "$nb"
@@ -719,23 +721,30 @@ STUB
     *) echo "SELF-TEST FAIL: a review that ran out of rounds was in nobody's queue — dev was told to stop and product was never told to pick it up, so it stops there (got: $out)" >&2; rc=1 ;;
   esac
 
-  # AND A FAILED AUTHOR LOOKUP MUST OFFER NOTHING AND SAY SO (Issue #79). Narrowed to ONE endpoint
-  # on purpose: a stub that fails everything cannot test this, because the queue dies on the first
-  # failed call and the arm goes green whether or not this path handles anything. Here the commit
-  # list of #9 fails on its FIRST call and succeeds after — which is what a SECONDARY rate limit
-  # does — so `--pr` comes back empty, `--all-trailers` succeeds, the both-empty guard does not
-  # fire, and the empty set matches no role. Measured before the fix: `dev` was offered its own
-  # pull request with `(built by )`.
+  # AND A FAILED COMMENT LOOKUP MUST OFFER NOTHING AND SAY SO.
+  #
+  # THIS ARM INHERITS ISSUE #79 AND ITS SUBJECT HAS MOVED. That defect was `2>/dev/null || echo ""`
+  # around the AUTHOR lookup: it turned a failed call into an empty author set, and a pull request
+  # was offered for review to the role that had written every commit in it, `(built by )`. This
+  # script no longer asks who authored anything — the branch name answers it, and the independence
+  # test that does still need the trailers lives in `check-review.sh`, which has its own arm for
+  # exactly this and re-derives from git besides.
+  #
+  # WHAT REMAINS IS THE SAME SHAPE ON A DIFFERENT CALL. The review history of a pull request is read
+  # over the API, and if THAT collapses to "no verdicts" the queue says `NO REVIEW HAS HAPPENED`
+  # about work that has been reviewed — sending a role to review it again — or silently omits it,
+  # which is the same wrong answer with a zero exit code.
+  #
+  # Narrowed to ONE endpoint on purpose: a stub that fails everything cannot test this, because the
+  # queue dies on the first failed call and the arm goes green whether or not this path handles
+  # anything.
   local tmp3
   tmp3=$(mktemp -d)
   cat > "$tmp3/gh" <<'STUB'
 #!/usr/bin/env bash
 case "$*" in
-  *"pulls/9/commits"*)
-    n=0; [ -f "$TMP3/calls" ] && n=$(cat "$TMP3/calls"); n=$((n+1)); printf '%s' "$n" > "$TMP3/calls"
-    [ "$n" = 1 ] && { echo 'You have exceeded a secondary rate limit' >&2; exit 1; }
-    printf 'c9\tAgent: dev\n' ;;
-  *"/commits/c9"*)      echo 'internal/a.go' ;;
+  *"issues/9/comments"*)
+    echo 'You have exceeded a secondary rate limit' >&2; exit 1 ;;
   *"pulls?state=open"*) echo '[{"number":9,"head":{"ref":"dev/feat/9-x","sha":"cafe"},"title":"feat(x): y"}]' ;;
   *"/status"*)          echo '{"statuses":[]}' ;;
   *)                    echo '[]' ;;
@@ -743,15 +752,15 @@ esac
 STUB
   chmod +x "$tmp3/gh"
   local arc=0
-  out=$( PATH="$tmp3:$PATH" TMP3="$tmp3" REPO=x/y bash "${BASH_SOURCE[0]}" dev 2>&1 ) || arc=$?
+  out=$( PATH="$tmp3:$PATH" REPO=x/y bash "${BASH_SOURCE[0]}" dev 2>&1 ) || arc=$?
   [ "$arc" -ne 0 ] || {
-    echo "SELF-TEST FAIL: the author lookup failed and the queue exited 0 — 'could not determine who built this' and 'determined that nobody did' have collapsed, and an agent reads a zero exit as an answer" >&2; rc=1; }
+    echo "SELF-TEST FAIL: the review history could not be read and the queue exited 0 — 'could not determine whether this was reviewed' and 'determined that it was not' have collapsed, and an agent reads a zero exit as an answer" >&2; rc=1; }
   case "$out" in
-    *"NO REVIEW HAS HAPPENED"*|*"re-review by"*) echo "SELF-TEST FAIL: a failed author lookup was rendered as an answer about whose pull request this is. The queue spoke about a question it could not ask, and a role acting on that either reviews work that is not its own or leaves its own unreviewed (got: $out)" >&2; rc=1 ;;
+    *"NO REVIEW HAS HAPPENED"*) echo "SELF-TEST FAIL: a failed lookup was rendered as 'no review has happened', which sends a role to review work that may already have been reviewed (got: $out)" >&2; rc=1 ;;
   esac
   case "$out" in
     *"::error::"*) : ;;
-    *) echo "SELF-TEST FAIL: the author lookup failed and nothing was printed — a non-zero exit with no reason reads as a bug in the queue rather than an outage (got: $out)" >&2; rc=1 ;;
+    *) echo "SELF-TEST FAIL: the lookup failed and nothing was printed — a non-zero exit with no reason reads as a bug in the queue rather than an outage (got: $out)" >&2; rc=1 ;;
   esac
   rm -rf "$tmp3"
   rm -rf "$tmp"
@@ -805,7 +814,7 @@ STUB
   esac
   rm -rf "$otmp"
 
-  [ "$rc" -eq 0 ] && echo "self-test passed: unknown roles refuse, every role has a queue, a failed lookup is not an empty queue, an unreviewed pull request is its author's work and nobody else's, a verdict on the current head settles it and one naming another head does not, a re-review goes back to the reviewer that already looked, a quoted verdict is not a verdict, three rounds of changes escalate to product and two do not, a failed author lookup offers nothing and says why, and the owner is told UNDETERMINED rather than being handed silence as a green light"
+  [ "$rc" -eq 0 ] && echo "self-test passed: unknown roles refuse, every role has a queue, a failed lookup is not an empty queue, an unreviewed pull request is its author's work and nobody else's, a verdict on the current head settles it and one naming another head does not, a re-review goes back to the reviewer that already looked, a quoted verdict is not a verdict, three rounds of changes escalate to product and two do not, a failed review-history lookup offers nothing and says why, and the owner is told UNDETERMINED rather than being handed silence as a green light"
   return $rc
 }
 
