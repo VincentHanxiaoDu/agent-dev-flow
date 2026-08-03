@@ -199,6 +199,27 @@ reads your role-marked comment and stops offering it.
 
 ## 8. The release
 
+**A RELEASE VERDICT THAT LIVES ONLY IN YOUR REPLY HAS NOT REACHED ANYONE.** Measured: a verdict —
+*"do not ship bbee48f, four blockers"* — was formed correctly and reached the owner only because they
+happened to be reading that window at that moment. The sha appeared in no file, no Issue and no
+label. Had they been away, nothing would have told them and nothing would have stopped the release.
+The owner's words: *"product 都没问我，我怎么知道我要决定?"*
+
+So, before you say anything about shipping:
+
+- **Label every blocker `blocks:release`.** That is what puts it in `queue.sh owner`, which is the
+  owner's only derived view of what is waiting on them. An unlabelled blocker is one you have
+  mentioned, not one you have reported.
+- **Post the verdict as a comment beginning `[product]` and containing `RELEASE`**, naming the sha
+  you judged. `queue.sh owner` counts these, and a board with no blocker and no verdict is reported
+  as **UNDETERMINED — nobody has looked**, never as ready.
+- **Then ask the owner with `AskUserQuestion`**, options and costs, your recommendation first. The
+  release is theirs to call and a decision they were never asked for is not a decision they made.
+
+**Remove `blocks:release` when the blocker closes.** A label nobody clears blocks every future
+release for a reason that has already been fixed.
+
+
 You call it; `/release-version` executes it. Before you do:
 
 - **Known defects are written down.** A named defect is shippable; an unnamed one is not.
