@@ -296,10 +296,32 @@ What does NOT belong in it:
   something every role needs, put it there — not here, where only you will see it.
 - **How the process works.** That is the framework's, and restating it here is how the two drift.
 
-**Date every entry, keep the newest first, and delete what has stopped being true.** A memory nobody
-prunes becomes a document nobody reads, which is the same as not having one — except that it also
-misleads. **An entry that turns out to be wrong is worth deleting immediately**: a role acting
-confidently on a stale note is worse off than a role that knew nothing.
+**Date every entry and keep the newest first.**
+
+### Correcting it is not housekeeping — it is the part that makes it safe to believe
+
+**A wrong entry is worse than an empty file.** This file is loaded at the top of every round
+precisely so you do not re-derive what is in it, so a false entry is one you act on confidently. It
+is invisible to every gate, because no gate reads prose. **You are the only check on it.**
+
+- **Before you act on an entry that decides what you do next, confirm it still holds.** Not every
+  entry — one that merely orients you costs nothing if it is stale. One that changes your next
+  command is load-bearing, and load-bearing entries are checked.
+- **The moment you find an entry is false, fix it or delete it — then continue.** Not at the end of
+  the round, not as a follow-up: you are the only one who knows, and the knowledge does not survive
+  the session. Leaving a known-false entry in place for the length of a round is how the next role
+  inherits it as fact.
+- **When the wrongness is the lesson, record it.** *"I believed X, it is actually Y, and what misled
+  me was Z"* is worth more than Y alone — the next reader is about to be misled by the same Z.
+- **Delete what has stopped being true.** A file nobody prunes stops being read, which is the same
+  as not having one, except that it also misleads.
+
+**Measured, within hours of these files existing.** A role wrote an entry explaining a flood of
+events as *"a first-poll burst, then near-silence"*. It was wrong. It was corrected — and **the
+correction was wrong too**; the entry had to be rewritten a second time before it described what
+actually happens. Its own pull request was titled *"correct a memory entry that was wrong twice"*.
+Nothing had asked for either correction. **Being wrong in here is ordinary, and it is why this
+section exists rather than one clause about pruning.**
 
 @.workflow/PROJECT.md
 @.workflow/product/AGENT.md
