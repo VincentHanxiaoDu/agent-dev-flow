@@ -653,8 +653,18 @@ self_test() {
   # gate rejects is the same defect with the signs reversed — the branch is refused and the role is
   # told to rename work it named correctly.
   for br in $ADF_BUILD_ROLES; do
-    ( cd "$(dirname "${BASH_SOURCE[0]}")" && bash ./check-naming.sh "$br/fix/1-x" HEAD ) >/dev/null 2>&1
-    case $? in
+    # `|| nrc=$?`, NOT A BARE SUBSHELL. Under `set -e` a compound command whose status nothing tests
+    # ENDS THE SCRIPT — so where `check-naming.sh` exits non-zero for a reason that has nothing to do
+    # with this arm (an unreachable base, a subject over the limit anywhere in the repository), the
+    # whole self-test died at this line having printed NOTHING and exited 1.
+    #
+    # Measured: green in the framework's own checkout, where that call happened to exit 0, and
+    # SILENTLY red in the first consumer it was installed into. A self-test that fails without
+    # saying anything is worse than one that fails loudly and worse than none — it is an outage
+    # wearing the costume of a broken script, which is this project's own subject matter.
+    local nrc=0
+    ( cd "$(dirname "${BASH_SOURCE[0]}")" && bash ./check-naming.sh "$br/fix/1-x" HEAD ) >/dev/null 2>&1 || nrc=$?
+    case $nrc in
       0|1) : ;;  # 1 is a base/trailer complaint about this repository, not about the branch name
       *) echo "SELF-TEST FAIL: the naming gate refused '$br/fix/1-x' outright, but '$br' has a queue here — the two lists disagree in the other direction" >&2; rc=1 ;;
     esac
