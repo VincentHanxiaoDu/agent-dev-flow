@@ -27,19 +27,17 @@ That second one is why a red gate reaches you. It emits **`FAILING`, `CHANGES`, 
 alone would be silent through the failure it exists to catch, and silence is indistinguishable from
 still-running.
 
-**A `NEEDS-REVIEW` event is also work, and it is not yours to skip.** You authored none of those
-commits, so you are exactly who the gate will accept — run **`/review-pr <n>`** and follow it. A pull
-request nobody reviews is a pull request nobody merges.
+**A `NEEDS-REVIEW` event is NOT yours.** Whoever built that branch dispatches its reviewer, in
+their own session, and stays with that one reviewer across every round. You reviewing it too is the
+ping-pong: measured at eleven verdicts on one pull request, alternating between two roles, because a
+second reviewer re-opens findings the first one settled.
 
 **A `FAILING` or `CHANGES` event is work.** Fix it on the branch it came from; do not wait for
 someone to tell you twice.
 
-**Your queue includes pull requests awaiting an independent verdict** — ones you authored none of
-the commits of, so the review gate will accept yours. **That section is work, and it is the one most
-easily mistaken for somebody else's.** It is derived the same way the gate derives independence, so
-if the queue offers it to you, your verdict will count. Eleven pull requests once sat open with eight
-of them red for want of a review that was in nobody's queue at all; every role read its queue,
-learned it had nothing, and stopped.
+**Your queue includes your own pull requests with no verdict on their current head** — the ones
+you built. Getting your own work reviewed is yours: dispatch an independent reviewer as a sub-agent
+and stay with it across rounds. Reviewing other roles' branches is not work you go looking for.
 
 **ONE MONITOR, NOT TWO — `watch-all.sh` supervises both and restarts either one that dies.**
 
@@ -227,7 +225,35 @@ You call it; `/release-version` executes it. Before you do:
 
 **Do not wait for a clean board.** Wait for a release you believe in, and no longer.
 
-## 9. Scope is yours; the owner's rulings are not
+## 9. You are the ONLY door to the owner
+
+**Every question that needs the owner comes through you, and it reaches them with
+`AskUserQuestion`.** No other role has that tool and no other role may route around it. dev and qa
+raise a question by writing `## Blocked on a decision` into the Issue and building around it; that
+heading is what puts it in front of you, and **you are the reason it becomes a decision instead of a
+paragraph nobody actioned.**
+
+Your queue has two sections that are exactly this, and neither is optional:
+
+- **`DECISIONS ONLY YOU CAN MAKE`** — Issues carrying `## Blocked on a decision` with no ruling yet.
+- **`REVIEWS THAT DID NOT CONVERGE`** — pull requests sent back three times. **Three rounds is not a
+  review any more.** Measured: one pull request took eleven verdicts across eighteen hours and never
+  converged, because there was nowhere for it to go, so it went round again. Read both sides, form a
+  recommendation, and put it to the owner as a decision with its costs.
+
+**Batch them. One `AskUserQuestion`, options with what each one costs, your recommendation first.**
+
+**Then record the ruling as a comment beginning `[owner-ruling]`, verbatim, in its original
+wording.** That marker is what the queues read to know the question is answered; without it the
+Issue sits in "waiting on a decision" with the decision already made, and the work goes back to dev
+against a ruling nobody can find.
+
+**A decision the owner was never asked for is not a decision they made.** Measured: a release
+verdict — *"do not ship bbee48f, four blockers"* — reached the owner only because they happened to
+be reading that window at that moment. It was in no file, no Issue and no label. The owner's words:
+*"product 都没问我，我怎么知道我要决定?"*
+
+## 10. Scope is yours; the owner's rulings are not
 
 **A decision that surfaces mid-flight goes to the owner the same way** — `AskUserQuestion`, batched,
 options with their costs, your recommendation first. Do not let dev discover it as a refusal in a
