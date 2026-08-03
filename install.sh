@@ -410,6 +410,7 @@ Installed and verified.
   /dev-workflow           resolve Issues into reviewed branches
   /qa-workflow            verify bugs and chores, merge, close
   /product-workflow       UAT features, close, decide to release
+  /config-workflow        tell it how THIS project is built, tested and accepted — run this first
   /create-feature <what>  turn a description into Issues with testable criteria
   /release-version <tag>  tag and publish a release product has called
 
@@ -442,5 +443,7 @@ if [ ! -d "$target/openspec" ]; then
   echo "    Two gates read openspec/ and both pass, saying NOT APPLICABLE, while it is absent."
   echo "    With it, dev writes a change per Issue and product archives before the merge."
 fi
-echo "  - put this project's own instructions in .workflow/<role>/AGENT.md — build commands,"
-echo "    domain vocabulary, conventions a newcomer gets wrong. The framework never touches those." 
+echo "  - RUN /config-workflow. It reads this repository, asks you only what it could not work out"
+echo "    — dev environment, the exact test commands, front end, end-to-end, which build product"
+echo "    accepts against, what 'done' means here — and writes .workflow/PROJECT.md, which every"
+echo "    role loads. Skip it and each role works the same things out separately, several times." 
