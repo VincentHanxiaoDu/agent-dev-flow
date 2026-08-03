@@ -1,25 +1,3 @@
-# ── THIS REPOSITORY RUNS UNDER ITS OWN PROCESS. ────────────────────────────────
-#
-# GENERATED FROM framework/.github/workflows/gates.yml. Do not hand-edit: check-dogfood.sh fails a
-# copy that has drifted, and the fix is to change the framework's own file and regenerate.
-#
-# WHY THIS FILE EXISTS AT ALL. It did not, for seventy-one commits. This repository defines five
-# gates, requires that nobody merge or review their own work, and shipped every one of those seventy-
-# one commits straight to an unprotected `main` with no pull request, no gate and no reviewer. It
-# distributed that machinery to other repositories by wholesale file replacement, instantly, with
-# nothing between a change and production.
-#
-# The cost was measured rather than imagined. Three defects reached consumers in one day — a review
-# gate that refused an archive-only pull request as though its commits carried no trailer, an
-# exemption that a blank line flipped on one git version and not another, and a self-test asserting
-# a property it could not have observed. All three are exactly what the review gate below is for.
-# All three were caught by qa, in production, after a reviewer had withdrawn a verdict it had
-# already posted.
-#
-# A process its own author is exempt from is a recommendation.
-#
-# The scripts live under framework/, which is the only difference from what consumers install.
-
 name: gates
 
 # Everything mechanical runs on the pull request. The review gate additionally listens to comments,
@@ -275,11 +253,16 @@ jobs:
             # landed from its comment never being parsed. check-review.sh exits 2 for a parsed
             # refusal and 1 for everything else, which is a fact the step recorded rather than a log
             # line grepped for. The grep version did not work and shipped anyway.
-            if [ "$(cat review.rc 2>/dev/null || echo 1)" = "2" ]; then
-              desc="Changes requested by a reviewer — the review landed and refused this head"
-            else
-              desc="No current review by an independent agent — see the log"
-            fi
+            case "$(cat review.rc 2>/dev/null || echo 1)" in
+              2) desc="Changes requested by a reviewer — the review landed and refused this head" ;;
+              # A FOURTH FACT NEEDS A FOURTH SENTENCE (#84). A verdict naming a sha this repository
+              # does not know was discarded in silence, and a reader of the status could not tell
+              # "nobody refused" from "nobody refused in a way the gate happened to parse". Saying
+              # "No current review" here would be true and would send them hunting for a comment
+              # that is sitting on the pull request naming a sha nobody can find.
+              4) desc="A verdict on this PR names an unknown sha and is not in force — see the log" ;;
+              *) desc="No current review by an independent agent — see the log" ;;
+            esac
           else
             # ACCUSATION IS RESERVED FOR THE ONE OUTCOME THAT MEANS IT. `cancelled`, `skipped` and
             # an empty string all land here and hold, rather than reporting that no review exists.

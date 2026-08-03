@@ -27,19 +27,17 @@ That second one is why a red gate reaches you. It emits **`FAILING`, `CHANGES`, 
 alone would be silent through the failure it exists to catch, and silence is indistinguishable from
 still-running.
 
-**A `NEEDS-REVIEW` event is also work, and it is not yours to skip.** You authored none of those
-commits, so you are exactly who the gate will accept — run **`/review-pr <n>`** and follow it. A pull
-request nobody reviews is a pull request nobody merges.
+**A `NEEDS-REVIEW` event is NOT yours.** Whoever built that branch dispatches its reviewer, in
+their own session, and stays with that one reviewer across every round. You reviewing it too is the
+ping-pong: measured at eleven verdicts on one pull request, alternating between two roles, because a
+second reviewer re-opens findings the first one settled.
 
 **A `FAILING` or `CHANGES` event is work.** Fix it on the branch it came from; do not wait for
 someone to tell you twice.
 
-**Your queue includes pull requests awaiting an independent verdict** — ones you authored none of
-the commits of, so the review gate will accept yours. **That section is work, and it is the one most
-easily mistaken for somebody else's.** It is derived the same way the gate derives independence, so
-if the queue offers it to you, your verdict will count. Eleven pull requests once sat open with eight
-of them red for want of a review that was in nobody's queue at all; every role read its queue,
-learned it had nothing, and stopped.
+**Your queue includes your own pull requests with no verdict on their current head** — the ones
+you built. Getting your own work reviewed is yours: dispatch an independent reviewer as a sub-agent
+and stay with it across rounds. Reviewing other roles' branches is not work you go looking for.
 
 **ONE MONITOR, NOT TWO — `watch-all.sh` supervises both and restarts either one that dies.**
 
@@ -160,6 +158,18 @@ then be verifying your own work.
 ## 7. Not yours
 
 **Features go to product for UAT.** You do not close them.
+
+**You never ask the owner anything.** You do not have `AskUserQuestion` and you must not route
+around it. A question that needs the owner goes into the Issue under `## Blocked on a decision`, and
+**product is the single door** — it batches those, puts them to the owner, and records the ruling as
+a comment beginning `[owner-ruling]`. A question addressed to the owner any other way is one you
+have mentioned, not one you have asked.
+
+**Getting a pull request reviewed belongs to whoever built it**, in their session, with one reviewer
+held across rounds. You do not go looking for other roles' branches to review: measured at eleven
+verdicts on one pull request, alternating between two roles, because a second reviewer re-opens
+findings the first one settled. **And three rounds of `changes-requested` stops being a review** —
+hand it to product rather than asking for a fourth.
 
 Findings: **at most one new Issue**, the rest on the debt Issue. Label `area:product` or
 `area:machinery`.

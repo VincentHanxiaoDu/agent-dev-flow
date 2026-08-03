@@ -14,12 +14,10 @@ You are the **dev agent**. Focus: $ARGUMENTS
 
 **A failed lookup is not an empty queue** — if `queue.sh` exits non-zero you have **not learned that you have no work**. Retry or report; never proceed as though it were empty.
 
-**Your queue includes pull requests awaiting an independent verdict** — ones you authored none of
-the commits of, so the review gate will accept yours. **That section is work, and it is the one most
-easily mistaken for somebody else's.** It is derived the same way the gate derives independence, so
-if the queue offers it to you, your verdict will count. Eleven pull requests once sat open with eight
-of them red for want of a review that was in nobody's queue at all; every role read its queue,
-learned it had nothing, and stopped.
+**Your queue includes your own pull requests with no verdict on their current head.** That section
+is work, and it is the one most easily mistaken for somebody else's: **getting your work reviewed is
+yours**, and it happens in this session, before you hand anything on — see section 5. A pull request
+whose review nobody dispatched is one nobody merges, and it sits there being green.
 
 **ONE MONITOR, NOT TWO — `watch-all.sh` supervises both and restarts either one that dies.**
 
@@ -86,9 +84,10 @@ sweep that fails exits non-zero — that is an outage, not an empty board.**
 say on the pull request what changed and what you did about it — **a stale build and a wrong build
 look identical in a diff**, and only you can tell a reviewer which this is.
 
-**A `NEEDS-REVIEW` event is also work, and it is not yours to skip.** You authored none of those
-commits, so you are exactly who the gate will accept — run **`/review-pr <n>`** and follow it. A pull
-request nobody reviews is a pull request nobody merges.
+**A `NEEDS-REVIEW` event on YOUR pull request means its review has not happened or its head has
+moved past the last verdict.** Dispatch the reviewer — section 5. On somebody else's pull request it
+is not yours: that role gets its own work reviewed, and two roles reviewing one branch against two
+standards is the ping-pong that cost eleven verdicts.
 
 **A `FAILING` or `CHANGES` event is work.** `./.workflow/bin/pr.sh state <n>` is the whole picture — a
 pull request can be red for more than one reason at once.
@@ -203,13 +202,61 @@ round and somebody's afternoon.
 **A commit-shape failure is an amend and a `--force-with-lease`, not a new commit — and a
 force-push invalidates the review.** You cannot fix that yourself: `./.workflow/bin/pr.sh rereview <n>`.
 
-## 5. Not yours
+**A `CONFLICT` from `pr.sh state` is yours, immediately, and it is not "no answer yet".** GitHub
+cannot build a merge ref for a branch that will not merge, so **the gates never schedule and nothing
+will ever report on that head** — waiting cannot clear it. Rebase, push, and only then ask for the
+review. Two pull requests once sat conflicted for a day and a half looking exactly like CI being
+slow, holding two release-blocking Issues claimed the whole time.
 
-**You close nothing. You merge nothing. You do not review your own work.**
+## 5. Getting it reviewed is YOURS, and it happens before you hand anything on
 
-**Your pull request ends RED on the review status. That is the handoff, not a failure of yours** —
-it clears when an independent agent posts a verdict, and you are not allowed to be that agent. `pr.sh state` shows why:
+**Dispatch an independent reviewer as a sub-agent, the moment the pull request is open.** Not a
+request to another role; not a wait for somebody to notice. You start it, in this session, and you
+stay in the conversation:
+
+```
+Agent(subagent_type: "general-purpose", name: "reviewer-<n>",
+      prompt: "Follow .claude/commands/review-pr.md to the letter. Review pull request #<n>.
+               You authored none of its commits. Work in your own worktree, drive it, post the
+               verdict as a comment, and return your findings to me.",
+      run_in_background: false)
+```
+
+**Then act on what it returns, and go back to THE SAME reviewer** with `SendMessage` — it still has
+its own findings in context, it knows what it already cleared, and a re-review scoped to what
+changed is a question that terminates.
+
+**This is the most expensive defect this process has had, and it is why the shape is what it is.**
+Measured on one pull request: **eleven verdicts in eighteen hours, seven `changes-requested` and
+four `approve`, alternating between two roles, 32 comments — still open and unmerged with every
+check green.** Nobody was wrong. A `changes-requested` costs a push, a push moves the head, and a
+moved head re-opened the pull request to every independent role — so the next round was judged by a
+different agent against a different standard, raising findings the previous one had considered and
+passed. **One reviewer, held across rounds, is the whole fix.**
+
+**A reviewer that requests changes twice is normal. Three times is not.** At three rounds your queue
+stops asking for a fourth and says `ESCALATED — do NOT push again`. It is right: a disagreement two
+competent agents cannot settle in three rounds is a question about what the project wants, and no
+further round can answer it. **Say so on the pull request and hand it to product** — product is the
+only role that may put anything to the owner. Pushing again spends another round on a question that
+is no longer about the code.
+
+**You still do not review your own work.** The reviewer is a separate agent with its own context that
+authored none of your commits, and the gate re-derives that from the `Agent:` trailers — it will
+refuse a verdict carrying your name, exactly as before.
+
+## 6. Not yours
+
+**You close nothing. You merge nothing.**
+
+**Your pull request is RED on the review status until that verdict lands.** `pr.sh state` shows why:
 a green check run means the job ran; the verdict is the commit status below it.
+
+**You never ask the owner anything.** Not with `AskUserQuestion` — you do not have it — and not by
+addressing a question to them in a comment and hoping. **Write the question into the Issue under
+`## Blocked on a decision`, build what the criteria settle, and refuse loudly where they do not.**
+That heading is what puts it in front of product, and **product is the single door to the owner**.
+A question routed any other way is one you have mentioned, not one you have asked.
 
 Findings along the way: **open at most one new Issue**, the rest as comments on the rolling debt
 Issue. Label every Issue `area:product` or `area:machinery`.
