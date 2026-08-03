@@ -208,8 +208,13 @@ behaves, where the traps are, and what you tried that did not work.
 Not here: work state (that is Issues and pull requests), decisions (those are \`[owner-ruling]\` on
 the Issue), project configuration (that is \`.workflow/PROJECT.md\`), or how the process works.
 
-Newest first. Date every entry. **Delete what has stopped being true** — a role acting confidently on
-a stale note is worse off than one that knew nothing.
+Newest first. Date every entry.
+
+**Correcting this file is the part that makes it safe to believe.** It is loaded at the top of every
+round so you do not re-derive what is in it — so a false entry is one you act on confidently, and no
+gate reads prose. The moment you find an entry is false, fix it or delete it, then continue; not at
+the end of the round, because you are the only one who knows. When the wrongness is the lesson,
+record what misled you as well as what is true.
 
 _(empty — nothing learned yet)_
 EOF
