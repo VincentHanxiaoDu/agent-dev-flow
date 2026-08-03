@@ -153,6 +153,11 @@ Your queue is one command:
 **If it exits non-zero you have not learned that you have no work.** Retry or report; never proceed as
 though it were empty.
 
+It lists the Issues you can start, the pull requests that are yours to merge, **and the pull requests
+waiting on a verdict you are independent enough to give.** That last section is the one a role skips
+as somebody else's — it is not. A board once deadlocked with eight pull requests red for want of a
+review that appeared in nobody's queue.
+
 Your board — every open pull request, and which of them are waiting on you — is one more:
 
 ```bash

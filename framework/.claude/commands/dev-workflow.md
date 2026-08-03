@@ -19,6 +19,13 @@ Monitor(command: "./.workflow/bin/watch-prs.sh dev 60",   description: "your PRs
 
 **A failed lookup is not an empty queue** — if `queue.sh` exits non-zero you have **not learned that you have no work**. Retry or report; never proceed as though it were empty.
 
+**Your queue includes pull requests awaiting an independent verdict** — ones you authored none of
+the commits of, so the review gate will accept yours. **That section is work, and it is the one most
+easily mistaken for somebody else's.** It is derived the same way the gate derives independence, so
+if the queue offers it to you, your verdict will count. Eleven pull requests once sat open with eight
+of them red for want of a review that was in nobody's queue at all; every role read its queue,
+learned it had nothing, and stopped.
+
 ### A watch can die, and a dead watch looks exactly like a quiet queue
 
 **Being woken is an optimisation. It is never how you find out what is waiting on you.** A monitor is
