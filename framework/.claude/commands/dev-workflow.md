@@ -280,4 +280,44 @@ attributable, and none of it could be seen by the queue.
 `Reviewed-by:` / `Reviewed-sha:` / `Verdict:` block the gate parses. They answer different questions
 — who is speaking, and what the verdict is — and neither substitutes for the other.
 
+## Your memory
+
+**`.workflow/dev/MEMORY.md` is yours.** The installer creates it once and never touches it; no
+refresh can take it away. It is committed, so it survives this session, this machine and this agent.
+
+**Read it at the start of every round**, before you touch the queue — it is loaded for you below, and
+the point of it is that you do not rediscover what you already learned.
+
+**Write to it the moment you learn something that cost you time and will cost the next round the same
+time.** Not at the end, when the round is over and you have stopped.
+
+What belongs in it:
+
+- **How this project actually behaves** — the test that caches its result unless you pass a flag, the
+  suite that needs a service up first, the command whose exit code lies, the flake and what makes it
+  flake.
+- **Where the traps are** — the file two Issues always collide in, the gate that fails for a reason
+  its message does not name, the thing that looks broken and is not.
+- **What you tried that did not work, and why** — so the next round does not spend an afternoon
+  reaching the same dead end. This is the highest-value entry and the one most often skipped.
+
+What does NOT belong in it:
+
+- **Work state.** What is in flight lives in Issues and pull requests, which every role can see;
+  putting it here makes a private copy that goes stale and disagrees with the board.
+- **Decisions.** A ruling is `[owner-ruling]` on the Issue, in the owner's words. A decision recorded
+  only in your memory is one nobody else is bound by.
+- **Project configuration.** How this project is built, tested and accepted belongs in
+  `.workflow/PROJECT.md`, written by `/config-workflow` and read by every role. If you learn
+  something every role needs, put it there — not here, where only you will see it.
+- **How the process works.** That is the framework's, and restating it here is how the two drift.
+
+**Date every entry, keep the newest first, and delete what has stopped being true.** A memory nobody
+prunes becomes a document nobody reads, which is the same as not having one — except that it also
+misleads. **An entry that turns out to be wrong is worth deleting immediately**: a role acting
+confidently on a stale note is worse off than a role that knew nothing.
+
+@.workflow/PROJECT.md
 @.workflow/dev/AGENT.md
+@.workflow/dev/MEMORY.md
+
