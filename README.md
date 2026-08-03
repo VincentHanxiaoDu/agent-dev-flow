@@ -27,15 +27,38 @@ if they fail. Writing files is not delivering a working process.
 **Already installed once?** `/init-workflow` does all of the above in any repository. The installer
 puts it in `~/.claude/commands/`.
 
+### Then tell it about your project
+
+```
+/config-workflow
+```
+
+It reads the repository, asks you only what it could not establish — dev environment, the exact test
+commands, front end, end-to-end, which build product does UAT against, what "done" means here — and
+writes the answers to `.workflow/PROJECT.md`, which every role loads.
+
+**Skipping this is expensive and quietly so.** Measured on a repository two days in: every
+`AGENT.md` still read *"(empty — nothing project-specific yet)"*, so each role worked out the same
+things separately, several times over.
+
 ### It will not overwrite your work
 
 | | |
 |---|---|
 | `.workflow/bin/`, `.github/`, `.claude/commands/` | **the framework's.** Replaced on every install. |
 | `.workflow/<role>/AGENT.md` | **yours.** Created once, never touched again. |
+| `.workflow/<role>/MEMORY.md` | **the role's own.** What it has learned about your project. |
+| `.workflow/PROJECT.md` | **yours.** Written by `/config-workflow`. |
 
-Your project's build commands, domain vocabulary and local conventions go in `AGENT.md`. If you find
-yourself writing process rules there, the framework is missing something — change it there instead.
+Your project's build commands, domain vocabulary and local conventions go in `PROJECT.md`. If you
+find yourself writing process rules there, the framework is missing something — change it there
+instead.
+
+**And an install now refuses rather than reverting you.** If you have changed a file under
+`.workflow/bin/` — because your repository hit the bug first, which is the usual reason — the
+installer stops and names the file instead of replacing it. Upstream the fix, then refresh;
+`--force` overwrites and says it is doing so. A refresh once deleted a merged fix and left a live
+fail-open on `main`.
 
 ---
 
@@ -50,7 +73,8 @@ by messaging each other, so they all run at once.
 | | `/product-workflow` | UAT, merge, close, decide to release |
 | **dev** | `/dev-workflow` | resolves Issues into reviewed branches |
 | **qa** | `/qa-workflow` | verifies bugs and chores, merges, closes |
-| *(optional)* | `/review-pr <n>` | reviews a pull request its author cannot |
+| *(any)* | `/config-workflow` | asks how this project is built, tested and accepted |
+| *(sub-agent)* | `/review-pr <n>` | reviews a pull request its author cannot |
 | **ops** | `/release-version <tag>` | tags and publishes what product called |
 
 **You type each one once.** `/dev-workflow` and `/qa-workflow` start monitors and wake themselves
