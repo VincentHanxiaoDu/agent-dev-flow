@@ -1,3 +1,10 @@
+# BASH, NAMED EXPLICITLY. `make` runs recipes under `/bin/sh`, which is bash on macOS and dash on
+# the Ubuntu runner — and dash has no `pipefail`, so this suite passed locally and died on CI with
+# `set: Illegal option -o pipefail` before running a single test. The failure was loud, which is the
+# only reason it cost minutes rather than a day; the same shape with a quiet failure is the one this
+# framework exists to catch.
+SHELL := /bin/bash
+
 # THE SUITE FOR THIS REPOSITORY IS EVERY SCRIPT'S OWN SELF-TEST, PLUS THE TWO CHECKS THAT READ THE
 # DOCUMENTS. There is nothing to compile here; the framework's correctness is entirely in whether
 # each gate can still be shown to fail, which is what --self-test asserts.
