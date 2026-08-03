@@ -8,6 +8,9 @@
 #        queue.sh --self-test
 set -euo pipefail
 
+# ONE LIST OF ROLES, shared with check-naming.sh — see roles.sh for what disagreeing cost.
+. "$(dirname "${BASH_SOURCE[0]}")/roles.sh"
+
 case "${1:-}" in
   -*)
     # An unknown flag is a typo, not data. A one-letter slip (`--self-tests`) must not be taken as
@@ -567,7 +570,20 @@ role_queue() {
       ;;
     ops)
       emit "OPEN PULL REQUESTS — CI and gate health:" \
-        '.[] | select(.pull_request!=null) | "  #\(.number)  \(.title)"' ;;
+        '.[] | select(.pull_request!=null) | "  #\(.number)  \(.title)"'
+      my_prs "ops/*"
+      unreviewed_own_prs ops ;;
+    # THE PROCESS'S OWN MAINTAINER. `flow/` branches are what this framework's own changes are
+    # built on, and until Issue #126 they passed the naming gate and reached no queue at all — the
+    # role existed in one list and not the other. It builds, so it gets what every building role
+    # gets: its own pull requests, and the reviews it owes on them.
+    flow)
+      emit "MACHINERY ISSUES — the process fixing itself:" \
+        '.[] | select(.pull_request==null)
+             | select([.labels[].name] | index("area:machinery"))
+             | "  #\(.number)  \(.title)"' --unbuilt
+      my_prs "flow/*"
+      unreviewed_own_prs flow ;;
     pm)
       # DECISIONS THE OWNER OWES — NOT WORK NOBODY CAN DO. The first version said "nobody can build
       # these", which contradicted dev's own instruction: an Issue carrying an open decision IS
@@ -597,7 +613,7 @@ role_queue() {
       [ "$m" -le "$p" ] || printf '  OVER THE CAP. Dispatch no further machinery work until this is 1:1 or better.\n'
       ;;
     *)
-      echo "::error::'$role' is not a role. One of: dev qa product ops pm owner" >&2; return 1 ;;
+      echo "::error::'$role' is not a role. One of: $ADF_ALL_ROLES" >&2; return 1 ;;
   esac
 }
 
@@ -614,6 +630,34 @@ self_test() {
   for r in dev qa product ops pm owner; do
     grep -q "^    $r)" "${BASH_SOURCE[0]}" \
       || { echo "SELF-TEST FAIL: role '$r' has no queue arm" >&2; rc=1; }
+  done
+
+  # EVERY ROLE A BRANCH MAY BE NAMED AFTER MUST HAVE A QUEUE THAT SHOWS IT ITS OWN WORK.
+  #
+  # THIS IS ISSUE #126 AND IT IS THE ONLY THING STOPPING IT COMING BACK. The naming gate accepted
+  # `flow/` and this script routed nothing to it, so a pull request was green on `Branch name and
+  # commit convention` and present in NO role's queue — no error, zero exit code, invisible. Both
+  # lists were correct on their own; nothing compared them.
+  #
+  # ASSERTED AGAINST THE SHARED LIST AND AGAINST THIS FILE'S ACTUAL ARMS, not against a second
+  # literal — a check that hard-codes the answer it is verifying passes when both copies are wrong
+  # together, which is exactly the failure being fixed.
+  local br
+  for br in $ADF_BUILD_ROLES; do
+    grep -q "^    $br)" "${BASH_SOURCE[0]}" \
+      || { echo "SELF-TEST FAIL: '$br' may own a branch — the naming gate builds its pattern from the same list — but has no queue arm here, so its pull requests are in nobody's queue and nothing says so (Issue #126)" >&2; rc=1; }
+    grep -q "unreviewed_own_prs $br" "${BASH_SOURCE[0]}" \
+      || { echo "SELF-TEST FAIL: '$br' may own a branch but is never shown its own unreviewed pull requests, so work it built waits for a review nobody is asked for" >&2; rc=1; }
+  done
+  # AND THE NAMING GATE MUST ACCEPT EXACTLY THESE. Driven, not read: a role with a queue that the
+  # gate rejects is the same defect with the signs reversed — the branch is refused and the role is
+  # told to rename work it named correctly.
+  for br in $ADF_BUILD_ROLES; do
+    ( cd "$(dirname "${BASH_SOURCE[0]}")" && bash ./check-naming.sh "$br/fix/1-x" HEAD ) >/dev/null 2>&1
+    case $? in
+      0|1) : ;;  # 1 is a base/trailer complaint about this repository, not about the branch name
+      *) echo "SELF-TEST FAIL: the naming gate refused '$br/fix/1-x' outright, but '$br' has a queue here — the two lists disagree in the other direction" >&2; rc=1 ;;
+    esac
   done
 
   # A failed lookup must exit non-zero rather than print an empty queue.
@@ -814,7 +858,7 @@ STUB
   esac
   rm -rf "$otmp"
 
-  [ "$rc" -eq 0 ] && echo "self-test passed: unknown roles refuse, every role has a queue, a failed lookup is not an empty queue, an unreviewed pull request is its author's work and nobody else's, a verdict on the current head settles it and one naming another head does not, a re-review goes back to the reviewer that already looked, a quoted verdict is not a verdict, three rounds of changes escalate to product and two do not, a failed review-history lookup offers nothing and says why, and the owner is told UNDETERMINED rather than being handed silence as a green light"
+  [ "$rc" -eq 0 ] && echo "self-test passed: unknown roles refuse, every role has a queue, every role that may own a branch has one that shows it its own work, a failed lookup is not an empty queue, an unreviewed pull request is its author's work and nobody else's, a verdict on the current head settles it and one naming another head does not, a re-review goes back to the reviewer that already looked, a quoted verdict is not a verdict, three rounds of changes escalate to product and two do not, a failed review-history lookup offers nothing and says why, and the owner is told UNDETERMINED rather than being handed silence as a green light"
   return $rc
 }
 
