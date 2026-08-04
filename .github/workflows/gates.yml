@@ -209,6 +209,13 @@ jobs:
           ref: ${{ steps.pr.outputs.head_sha }}
           fetch-depth: 0
 
+      # uv, FOR THE SAME REASON AS THE OTHER JOBS: `--self-test` runs the suite, and the suite uses
+      # pytest. Three jobs invoke a self-test and each needs it; adding it to two of them is how
+      # this gate came back red saying "the review checker failed its own self-test", which is a
+      # true sentence about a missing tool and reads as a broken checker.
+      - name: uv (for --self-test)
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Self-test the checker
         id: selftest
         run: ./framework/.workflow/bin/check-review.sh --self-test
