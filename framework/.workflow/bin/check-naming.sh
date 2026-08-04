@@ -5,8 +5,14 @@
 #        check-naming.sh --self-test
 set -euo pipefail
 
-# ONE LIST OF ROLES, shared with queue.sh — see roles.sh for what disagreeing cost.
-. "$(dirname "${BASH_SOURCE[0]}")/roles.sh"
+# ONE LIST OF ROLES, and it lives in ../adf/roles.py now. This gate is the only bash left that
+# needs it, so it ASKS rather than keeping a second copy — a second copy is Issue #126, where this
+# file accepted `flow/` and the queue routed nothing to it, so a branch was green here and in
+# nobody's queue.
+ADF_ROLE_ALT=$(python3 "$(dirname "${BASH_SOURCE[0]}")/../adf/roles.py" --alt) || {
+  echo "::error::could not read the role list. This is a LOOKUP FAILURE and NOT a statement that this branch is misnamed." >&2
+  exit 2; }
+adf_build_roles_alt() { printf '%s' "$ADF_ROLE_ALT"; }
 
 case "${1:-}" in
   -*) [ "$1" = "--self-test" ] || {
