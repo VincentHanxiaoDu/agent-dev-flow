@@ -79,9 +79,108 @@ class Emitter:
         print(line, flush=True)
 
 
+# -- what main looks like ------------------------------------------------------
+# READ FROM THE PUSH RUN AND NOT FROM ITS CHECK RUNS. `issue_comment` fires from the default branch,
+# so its jobs — conditioned out for anything but a pull request — file themselves as SKIPPED CHECK
+# RUNS AGAINST MAIN'S HEAD SHA, timestamped after the real push run. Reading check runs therefore
+# returns "skipped" for a build that actually passed, and would return "skipped" just the same for
+# one that actually failed. The push run is the only place main's real colour survives.
+#
+# THREE ANSWERS, NEVER TWO. A run still going is not a pass, and a lookup that failed is not a pass
+# either; both would otherwise be spelled the same way as green and a red main would go unmentioned.
+UNKNOWN, GREEN_MAIN, RED_MAIN, RUNNING_MAIN = "unknown", "green", "red", "running"
+
+
+@dataclass
+class MainState:
+    kind: str
+    sha: str = ""
+    line: str = ""
+    failing: str = ""
+    red_sha: str = ""
+
+
+def failing_checks(client: Client, repo: str, run_id) -> str:
+    """WHICH CHECK IS RED, BY NAME. A bare `(failure)` sends the reader to the Actions tab to find
+    out what the watch had already been told."""
+    if not run_id:
+        return "failing check NOT DETERMINED — the run carried no id"
+    try:
+        jobs = client.get(f"repos/{repo}/actions/runs/{run_id}/jobs") or {}
+    except LookupFailure:
+        return "failing check NOT DETERMINED — the run's jobs could not be read"
+    names = [j["name"] for j in (jobs.get("jobs") or [])
+             if j.get("conclusion") in ("failure", "timed_out", "cancelled")]
+    # AN UNREADABLE ANSWER IS NOT AN EMPTY ONE. A run that is red must have a red job in it; if none
+    # came back, the query did not answer and must not be rendered as "nothing was failing".
+    if not names:
+        return "failing check NOT DETERMINED — the run is red but no failing job was returned"
+    return ", ".join(names)
+
+
+def main_state(client: Client, repo: str) -> MainState:
+    try:
+        runs = client.get(f"repos/{repo}/actions/runs?branch=main&event=push&per_page=1") or {}
+    except LookupFailure:
+        return MainState(UNKNOWN, line="MAIN STATE UNKNOWN (could not read the push run — "
+                                       "check main yourself before merging more)")
+    wr = (runs.get("workflow_runs") or [])
+    if not wr:
+        return MainState(UNKNOWN, line="MAIN STATE UNKNOWN (no push run found on main — "
+                                       "check main yourself)")
+    run = wr[0]
+    status, concl = run.get("status") or "", run.get("conclusion") or ""
+    full = run.get("head_sha") or ""
+    sha = full[:8] or "?"
+    if concl == "success":
+        return MainState(GREEN_MAIN, sha=sha, line=f"main is GREEN at {sha}")
+    if status == "completed":
+        which = failing_checks(client, repo, run.get("id"))
+        return MainState(RED_MAIN, sha=sha, red_sha=full, failing=which,
+                         line=f"MAIN IS RED at {sha} — the failing check is: {which}")
+    return MainState(RUNNING_MAIN, sha=sha,
+                     line=f"main's build is still running at {sha} — not green yet, watch it out")
+
+
+def attribute_red_main(state: MainState, merge_sha: str | None) -> str:
+    """WHOSE RED IS IT? DERIVED, OR SAID TO BE UNDETERMINED — NEVER INFERRED FROM WHO MERGED LAST.
+
+    Issue #64. This once read: "MAIN IS RED at 19f05904 — YOU merged into it, so this is yours to
+    fix before merging anything else". **main was red and the alarm was right to fire**, but the
+    merges did not cause it: `19f05904` was a DIRECT PUSH to main by the framework, one parent, so
+    the merge-commit exemption in the naming gate did not apply and its 113-character subject
+    reddened the board. It was nobody's merge.
+
+    Inferring the cause from who merged last is a proxy for authorship that stops measuring it the
+    moment anything else can redden main — and something else can, BY DESIGN, because the framework
+    pushes to main. Sending a merger to fix a commit they did not write is the same error
+    `pr-authors` exists to end: an attribution that does not match the diff.
+    """
+    if state.kind != RED_MAIN:
+        return ""
+    if not merge_sha or not state.red_sha:
+        return "  CAUSE NOT DETERMINED — this may or may not be yours."
+    if merge_sha.startswith(state.red_sha[:8]) or state.red_sha.startswith(merge_sha[:8]):
+        return "  YOU merged into it, so this is yours to fix before merging anything else."
+    return ("  CAUSE NOT DETERMINED — main's failing commit is not the merge you made, so this may "
+            "not be yours.")
+
+
 def pr_events(client: Client, repo: str, role: str, em: Emitter) -> None:
-    """One pass over every open pull request. The same code the monitor runs, which is why `--sweep`
-    cannot drift from it — a fallback that differs from the thing it backs up is worse than none."""
+    """One pass over every open pull request, and the ones that just merged. The same code the
+    monitor runs, which is why `--sweep` cannot drift from it — a fallback that differs from the
+    thing it backs up is worse than none."""
+    # THE MERGE IS NOT FINISHED UNTIL MAIN IS GREEN, so the MERGED event carries main's colour: the
+    # role that changed main is the one that has to know. Two pull requests each green against an
+    # older main can be red together — nothing tested them merged, and gates run on branches.
+    #
+    # ASKED ONCE PER POLL, however many merges there are to describe.
+    merged = [p for p in client.paginate(f"repos/{repo}/pulls?state=closed") if p.get("merged_at")]
+    if merged:
+        st = main_state(client, repo)
+        for p in sorted(merged, key=lambda x: x["merged_at"])[-5:]:
+            em.emit("MERGED", p["number"], (p.get("title") or "")[:52],
+                    st.line + attribute_red_main(st, p.get("merge_commit_sha")))
     prs = client.paginate(f"repos/{repo}/pulls?state=open")
     for p in prs:
         num, ref, sha = p["number"], p["head"]["ref"], p["head"]["sha"]
@@ -182,9 +281,15 @@ def main(argv: list[str]) -> int:
     # which is the only place the shims exist — the framework's own `make ci` skips them by design.
     if "--self-test" in argv:
         return _self_test()
-    if len(argv) < 2:
-        print("usage: watch.py prs|queue|all <role> [interval] [--sweep]", file=sys.stderr)
+    if len(argv) < 2 and "--main-state" not in argv:
+        print("usage: watch.py prs|queue|all <role> [interval] [--sweep|--main-state]",
+              file=sys.stderr)
         return 2
+    if "--main-state" in argv:
+        # NO ROLE NEEDED: it asks about main, not about anybody's queue.
+        st = main_state(Client(), resolve_repo())
+        print(st.line)
+        return 0
     kind, role = argv[0], argv[1]
     if role not in ("dev", "qa", "product", "ops", "flow", "pm"):
         print(f"::error::'{role}' is not a role.", file=sys.stderr)

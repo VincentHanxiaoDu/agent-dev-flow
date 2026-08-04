@@ -159,3 +159,87 @@ def test_the_heartbeat_arrives_on_the_first_poll_and_every_tenth(capsys):
         w.resolve_repo = orig
     out = capsys.readouterr().out
     assert out.count("WATCHING") == 2, f"heartbeat on poll 1 and poll 10 only, got:\n{out}"
+
+
+# -- main's colour -------------------------------------------------------------
+class Runs:
+    def __init__(self, runs, jobs=None, boom=False):
+        self.runs, self.jobs, self.boom = runs, jobs or [], boom
+
+    def get(self, path):
+        if self.boom:
+            raise LookupFailure("403")
+        if "actions/runs?" in path:
+            return {"workflow_runs": self.runs}
+        if "/jobs" in path:
+            return {"jobs": self.jobs}
+        return {}
+
+
+def test_mains_colour_comes_from_the_push_run_not_its_check_runs():
+    """`issue_comment` fires from the default branch, so its jobs — conditioned out for anything but
+    a pull request — file themselves as SKIPPED CHECK RUNS against main's head sha, timestamped
+    after the real push run. Reading check runs returns 'skipped' for a build that passed and for
+    one that failed, identically. The push run is the only place main's real colour survives."""
+    st = watch.main_state(Runs([{"status": "completed", "conclusion": "success",
+                                 "head_sha": "abcdef1234", "id": 1}]), "o/r")
+    assert st.kind == watch.GREEN_MAIN and "GREEN" in st.line
+
+
+def test_a_running_build_is_not_a_green_one():
+    """Three answers, never two. A run still going spelled the same way as green is how a red main
+    goes unmentioned."""
+    st = watch.main_state(Runs([{"status": "in_progress", "conclusion": None,
+                                 "head_sha": "abcdef1234", "id": 1}]), "o/r")
+    assert st.kind == watch.RUNNING_MAIN and "still running" in st.line
+
+
+def test_a_failed_lookup_is_not_a_green_main():
+    st = watch.main_state(Runs([], boom=True), "o/r")
+    assert st.kind == watch.UNKNOWN and "UNKNOWN" in st.line
+
+
+def test_no_push_run_at_all_is_unknown_not_green():
+    st = watch.main_state(Runs([]), "o/r")
+    assert st.kind == watch.UNKNOWN
+
+
+def test_a_red_main_names_the_failing_check():
+    """A bare `(failure)` sends the reader to the Actions tab to find out what the watch had already
+    been told."""
+    st = watch.main_state(
+        Runs([{"status": "completed", "conclusion": "failure", "head_sha": "19f05904aa", "id": 7}],
+             jobs=[{"name": "Branch name and commit convention", "conclusion": "failure"},
+                   {"name": "Build and tests", "conclusion": "success"}]), "o/r")
+    assert st.kind == watch.RED_MAIN
+    assert "Branch name and commit convention" in st.line and "Build and tests" not in st.line
+
+
+def test_a_red_run_with_no_failing_job_returned_is_undetermined_not_empty():
+    """A run that is red must have a red job in it; if none came back, the query did not answer and
+    must not be rendered as 'nothing was failing'."""
+    st = watch.main_state(
+        Runs([{"status": "completed", "conclusion": "failure", "head_sha": "aa", "id": 7}],
+             jobs=[]), "o/r")
+    assert "NOT DETERMINED" in st.failing
+
+
+def test_a_red_main_does_not_tell_the_last_merger_it_is_theirs():
+    """Issue #64, and it was acted on twice. main was red and the alarm was right to fire — but
+    19f05904 was a DIRECT PUSH by the framework, one parent, so the merge-commit exemption in the
+    naming gate did not apply and its 113-character subject reddened the board. It was nobody's
+    merge. Inferring the cause from who merged last stops measuring authorship the moment anything
+    else can redden main, and something else can BY DESIGN."""
+    st = watch.MainState(watch.RED_MAIN, sha="19f05904", red_sha="19f05904aabbcc")
+    assert "NOT DETERMINED" in watch.attribute_red_main(st, "deadbeef0000")
+
+
+def test_a_red_main_that_IS_your_merge_says_so():
+    """The attribution stays possible — it is derived, not abandoned."""
+    st = watch.MainState(watch.RED_MAIN, sha="19f05904", red_sha="19f05904aabbcc")
+    assert "YOU merged into it" in watch.attribute_red_main(st, "19f05904aabbcc")
+
+
+def test_no_merge_sha_means_undetermined_rather_than_yours():
+    st = watch.MainState(watch.RED_MAIN, sha="19f05904", red_sha="19f05904aabbcc")
+    assert "NOT DETERMINED" in watch.attribute_red_main(st, None)
